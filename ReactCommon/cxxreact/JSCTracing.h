@@ -5,7 +5,8 @@
 #if defined(WITH_JSC_EXTRA_TRACING) || DEBUG
 
 #include <inttypes.h>
-#include <jschelpers/JavaScriptCore.h>
+
+#include <JavaScriptCore/JSContextRef.h>
 
 namespace facebook {
 namespace react {

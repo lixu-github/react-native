@@ -33,7 +33,7 @@ const LinkingManager = Platform.OS === 'android' ?
  *
  * ```
  * componentDidMount() {
- *   Linking.getInitialURL().then((url) => {
+ *   var url = Linking.getInitialURL().then((url) => {
  *     if (url) {
  *       console.log('Initial url is: ' + url);
  *     }
@@ -48,20 +48,20 @@ const LinkingManager = Platform.OS === 'android' ?
  * you may set the `launchMode` of MainActivity to `singleTask` in
  * `AndroidManifest.xml`. See [`<activity>`](http://developer.android.com/guide/topics/manifest/activity-element.html)
  * documentation for more information.
- *
+ * 
  * ```
  * <activity
  *   android:name=".MainActivity"
  *   android:launchMode="singleTask">
  * ```
- *
+ * 
  * NOTE: On iOS you'll need to link `RCTLinking` to your project by following
  * the steps described [here](docs/linking-libraries-ios.html#manual-linking).
  * In case you also want to listen to incoming app links during your app's
  * execution you'll need to add the following lines to you `*AppDelegate.m`:
  *
  * ```
- * #import <React/RCTLinkingManager.h>
+ * #import "RCTLinkingManager.h"
  *
  * - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
  *   sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
@@ -115,11 +115,11 @@ const LinkingManager = Platform.OS === 'android' ?
  * ```
  */
 class Linking extends NativeEventEmitter {
-
+  
   constructor() {
-    super(LinkingManager);
+    super(LinkingManager); 
   }
-
+  
   /**
    * Add a handler to Linking changes by listening to the `url` event type
    * and providing the handler
@@ -138,8 +138,7 @@ class Linking extends NativeEventEmitter {
   /**
    * Try to open the given `url` with any of the installed apps.
    *
-   * You can use other URLs, like a location (e.g. "geo:37.484847,-122.148386" on Android
-   * or "http://maps.apple.com/?ll=37.484847,-122.148386" on iOS), a contact,
+   * You can use other URLs, like a location (e.g. "geo:37.484847,-122.148386"), a contact,
    * or any other URL that can be opened with the installed apps.
    *
    * NOTE: This method will fail if the system doesn't know how to open the specified URL.

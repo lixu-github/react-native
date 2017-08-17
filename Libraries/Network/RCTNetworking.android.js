@@ -7,7 +7,6 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule RCTNetworking
- * @flow
  */
 'use strict';
 
@@ -16,14 +15,9 @@
 const FormData = require('FormData');
 const NativeEventEmitter = require('NativeEventEmitter');
 const RCTNetworkingNative = require('NativeModules').Networking;
-const convertRequestBody = require('convertRequestBody');
-
-import type {RequestBody} from 'convertRequestBody';
 
 type Header = [string, string];
 
-// Convert FormData headers to arrays, which are easier to consume in
-// native on Android.
 function convertHeadersMapToArray(headers: Object): Array<Header> {
   const headerArray = [];
   for (const name in headers) {
@@ -33,7 +27,7 @@ function convertHeadersMapToArray(headers: Object): Array<Header> {
 }
 
 let _requestId = 1;
-function generateRequestId(): number {
+function generateRequestId() {
   return _requestId++;
 }
 
@@ -47,23 +41,16 @@ class RCTNetworking extends NativeEventEmitter {
     super(RCTNetworkingNative);
   }
 
-  sendRequest(
-    method: string,
-    trackingName: string,
-    url: string,
-    headers: Object,
-    data: RequestBody,
-    responseType: 'text' | 'base64',
-    incrementalUpdates: boolean,
-    timeout: number,
-    callback: (requestId: number) => any
-  ) {
-    const body = convertRequestBody(data);
-    if (body && body.formData) {
-      body.formData = body.formData.map((part) => ({
-        ...part,
-        headers: convertHeadersMapToArray(part.headers),
-      }));
+  sendRequest(method, url, headers, data, incrementalUpdates, timeout, callback) {
+    if (typeof data === 'string') {
+      data = {string: data};
+    } else if (data instanceof FormData) {
+      data = {
+        formData: data.getParts().map((part) => {
+          part.headers = convertHeadersMapToArray(part.headers);
+          return part;
+        }),
+      };
     }
     const requestId = generateRequestId();
     RCTNetworkingNative.sendRequest(
@@ -71,19 +58,18 @@ class RCTNetworking extends NativeEventEmitter {
       url,
       requestId,
       convertHeadersMapToArray(headers),
-      {...body, trackingName},
-      responseType,
+      data,
       incrementalUpdates,
       timeout
     );
     callback(requestId);
   }
 
-  abortRequest(requestId: number) {
+  abortRequest(requestId) {
     RCTNetworkingNative.abortRequest(requestId);
   }
 
-  clearCookies(callback: (result: boolean) => any) {
+  clearCookies(callback) {
     RCTNetworkingNative.clearCookies(callback);
   }
 }

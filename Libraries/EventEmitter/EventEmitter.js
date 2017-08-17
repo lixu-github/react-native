@@ -10,11 +10,9 @@
  * @noflow
  * @typecheck
  */
-'use strict';
 
 const EmitterSubscription = require('EmitterSubscription');
 const EventSubscriptionVendor = require('EventSubscriptionVendor');
-
 const emptyFunction = require('fbjs/lib/emptyFunction');
 const invariant = require('fbjs/lib/invariant');
 
@@ -80,9 +78,9 @@ class EventEmitter {
    *   listener
    */
   once(eventType: string, listener: Function, context: ?Object): EmitterSubscription {
-    return this.addListener(eventType, (...args) => {
+    return this.addListener(eventType, () => {
       this.removeCurrentListener();
-      listener.apply(context, args);
+      listener.apply(context, arguments);
     });
   }
 

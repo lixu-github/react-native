@@ -23,17 +23,18 @@ public class ReactTextChangedEvent extends Event<ReactTextChangedEvent> {
   public static final String EVENT_NAME = "topChange";
 
   private String mText;
-  private float mContentWidth;
-  private float mContentHeight;
+  private int mContentWidth;
+  private int mContentHeight;
   private int mEventCount;
 
   public ReactTextChangedEvent(
       int viewId,
+      long timestampMs,
       String text,
-      float contentSizeWidth,
-      float contentSizeHeight,
+      int contentSizeWidth,
+      int contentSizeHeight,
       int eventCount) {
-    super(viewId);
+    super(viewId, timestampMs);
     mText = text;
     mContentWidth = contentSizeWidth;
     mContentHeight = contentSizeHeight;

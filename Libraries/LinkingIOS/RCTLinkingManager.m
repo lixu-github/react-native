@@ -9,20 +9,15 @@
 
 #import "RCTLinkingManager.h"
 
-#import <React/RCTBridge.h>
-#import <React/RCTEventDispatcher.h>
-#import <React/RCTUtils.h>
+#import "RCTBridge.h"
+#import "RCTEventDispatcher.h"
+#import "RCTUtils.h"
 
 NSString *const RCTOpenURLNotification = @"RCTOpenURLNotification";
 
 @implementation RCTLinkingManager
 
 RCT_EXPORT_MODULE()
-
-- (dispatch_queue_t)methodQueue
-{
-  return dispatch_get_main_queue();
-}
 
 - (void)startObserving
 {
@@ -110,9 +105,11 @@ RCT_EXPORT_METHOD(getInitialURL:(RCTPromiseResolveBlock)resolve
   NSURL *initialURL = nil;
   if (self.bridge.launchOptions[UIApplicationLaunchOptionsURLKey]) {
     initialURL = self.bridge.launchOptions[UIApplicationLaunchOptionsURLKey];
-  } else {
+  } else if (&UIApplicationLaunchOptionsUserActivityDictionaryKey &&
+             self.bridge.launchOptions[UIApplicationLaunchOptionsUserActivityDictionaryKey]) {
     NSDictionary *userActivityDictionary =
       self.bridge.launchOptions[UIApplicationLaunchOptionsUserActivityDictionaryKey];
+
     if ([userActivityDictionary[UIApplicationLaunchOptionsUserActivityTypeKey] isEqual:NSUserActivityTypeBrowsingWeb]) {
       initialURL = ((NSUserActivity *)userActivityDictionary[@"UIApplicationLaunchOptionsUserActivityKey"]).webpageURL;
     }

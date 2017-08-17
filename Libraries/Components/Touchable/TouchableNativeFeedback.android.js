@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var Platform = require('Platform');
+var PropTypes = require('ReactPropTypes');
 var React = require('React');
 var ReactNative = require('ReactNative');
 var Touchable = require('Touchable');
@@ -18,9 +18,9 @@ var TouchableWithoutFeedback = require('TouchableWithoutFeedback');
 var UIManager = require('UIManager');
 
 var ensurePositiveDelayProps = require('ensurePositiveDelayProps');
+var onlyChild = require('onlyChild');
 var processColor = require('processColor');
-
-var PropTypes = React.PropTypes;
+var requireNativeComponent = require('requireNativeComponent');
 
 var rippleBackgroundPropType = PropTypes.shape({
   type: React.PropTypes.oneOf(['RippleAndroid']),
@@ -38,6 +38,12 @@ var backgroundPropType = PropTypes.oneOfType([
   themeAttributeBackgroundPropType,
 ]);
 
+var TouchableView = requireNativeComponent('RCTView', null, {
+  nativeOnly: {
+    nativeBackgroundAndroid: backgroundPropType,
+  }
+});
+
 type Event = Object;
 
 var PRESS_RETENTION_OFFSET = {top: 20, left: 20, right: 20, bottom: 30};
@@ -45,11 +51,9 @@ var PRESS_RETENTION_OFFSET = {top: 20, left: 20, right: 20, bottom: 30};
 /**
  * A wrapper for making views respond properly to touches (Android only).
  * On Android this component uses native state drawable to display touch
- * feedback.
- *
- * At the moment it only supports having a single View instance as a child
- * node, as it's implemented by replacing that View with another instance of
- * RCTView node with some additional properties set.
+ * feedback. At the moment it only supports having a single View instance as a
+ * child node, as it's implemented by replacing that View with another instance
+ * of RCTView node with some additional properties set.
  *
  * Background drawable of native feedback touchable can be customized with
  * `background` property.
@@ -82,17 +86,6 @@ var TouchableNativeFeedback = React.createClass({
      * methods to generate that dictionary.
      */
     background: backgroundPropType,
-
-    /**
-     * Set to true to add the ripple effect to the foreground of the view, instead of the
-     * background. This is useful if one of your child views has a background of its own, or you're
-     * e.g. displaying images, and you don't want the ripple to be covered by them.
-     *
-     * Check TouchableNativeFeedback.canUseNativeForeground() first, as this is only available on
-     * Android 6.0 and above. If you try to use this on older versions you will get a warning and
-     * fallback to background.
-     */
-    useForeground: PropTypes.bool,
   },
 
   statics: {
@@ -124,10 +117,6 @@ var TouchableNativeFeedback = React.createClass({
     Ripple: function(color: string, borderless: boolean) {
       return {type: 'RippleAndroid', color: processColor(color), borderless: borderless};
     },
-
-    canUseNativeForeground: function() {
-      return Platform.OS === 'android' && Platform.Version >= 23;
-    }
   },
 
   mixins: [Touchable.Mixin],
@@ -196,7 +185,7 @@ var TouchableNativeFeedback = React.createClass({
 
   _handleResponderMove: function(e) {
     this.touchableHandleResponderMove(e);
-    this._dispatchHotspotUpdate(e.nativeEvent.locationX, e.nativeEvent.locationY);
+    this._dispatchHotspotUpdate(e.nativeEvent.pageX, e.nativeEvent.pageY);
   },
 
   _dispatchHotspotUpdate: function(destX, destY) {
@@ -216,7 +205,7 @@ var TouchableNativeFeedback = React.createClass({
   },
 
   render: function() {
-    const child = React.Children.only(this.props.children);
+    const child = onlyChild(this.props.children);
     let children = child.props.children;
     if (Touchable.TOUCH_TARGET_DEBUG && child.type.displayName === 'View') {
       if (!Array.isArray(children)) {
@@ -224,19 +213,9 @@ var TouchableNativeFeedback = React.createClass({
       }
       children.push(Touchable.renderDebugView({color: 'brown', hitSlop: this.props.hitSlop}));
     }
-    if (this.props.useForeground && !TouchableNativeFeedback.canUseNativeForeground()) {
-      console.warn(
-        'Requested foreground ripple, but it is not available on this version of Android. ' +
-        'Consider calling TouchableNativeFeedback.canUseNativeForeground() and using a different ' +
-        'Touchable if the result is false.');
-    }
-    const drawableProp =
-      this.props.useForeground && TouchableNativeFeedback.canUseNativeForeground()
-        ? 'nativeForegroundAndroid'
-        : 'nativeBackgroundAndroid';
     var childProps = {
       ...child.props,
-      [drawableProp]: this.props.background,
+      nativeBackgroundAndroid: this.props.background,
       accessible: this.props.accessible !== false,
       accessibilityLabel: this.props.accessibilityLabel,
       accessibilityComponentType: this.props.accessibilityComponentType,
@@ -252,14 +231,7 @@ var TouchableNativeFeedback = React.createClass({
       onResponderRelease: this.touchableHandleResponderRelease,
       onResponderTerminate: this.touchableHandleResponderTerminate,
     };
-
-    // We need to clone the actual element so that the ripple background drawable
-    // can be applied directly to the background of this element rather than to
-    // a wrapper view as done in other Touchable*
-    return React.cloneElement(
-      child,
-      childProps
-    );
+    return <TouchableView {...childProps}/>;
   }
 });
 

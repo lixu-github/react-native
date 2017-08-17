@@ -15,8 +15,6 @@ const IncrementalGroup = require('IncrementalGroup');
 const React = require('React');
 const View = require('View');
 
-const ViewPropTypes = require('ViewPropTypes');
-
 import type {Context} from 'Incremental';
 
 /**
@@ -32,12 +30,12 @@ import type {Context} from 'Incremental';
  * See Incremental.js for more info.
  */
 type Props = {
-  name: string,
-  disabled?: boolean,
-  onDone?: () => void,
-  onLayout?: (event: Object) => void,
-  style?: mixed,
-  children?: any,
+  name: string;
+  disabled?: boolean;
+  onDone?: () => void;
+  onLayout?: (event: Object) => void;
+  style?: mixed;
+  children?: any;
 }
 class IncrementalPresenter extends React.Component {
   props: Props;
@@ -49,7 +47,7 @@ class IncrementalPresenter extends React.Component {
     disabled: React.PropTypes.bool,
     onDone: React.PropTypes.func,
     onLayout: React.PropTypes.func,
-    style: ViewPropTypes.style,
+    style: View.propTypes.style,
   };
   static contextTypes = {
     incrementalGroup: React.PropTypes.object,

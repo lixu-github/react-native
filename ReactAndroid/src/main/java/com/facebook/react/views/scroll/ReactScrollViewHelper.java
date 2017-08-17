@@ -12,8 +12,8 @@ package com.facebook.react.views.scroll;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.common.SystemClock;
 import com.facebook.react.uimanager.UIManagerModule;
 
 /**
@@ -22,9 +22,6 @@ import com.facebook.react.uimanager.UIManagerModule;
 public class ReactScrollViewHelper {
 
   public static final long MOMENTUM_DELAY = 20;
-  public static final String OVER_SCROLL_ALWAYS = "always";
-  public static final String AUTO = "auto";
-  public static final String OVER_SCROLL_NEVER = "never";
 
   /**
    * Shared by {@link ReactScrollView} and {@link ReactHorizontalScrollView}.
@@ -60,6 +57,7 @@ public class ReactScrollViewHelper {
     reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(
         ScrollEvent.obtain(
             scrollView.getId(),
+            SystemClock.nanoTime(),
             scrollEventType,
             scrollView.getScrollX(),
             scrollView.getScrollY(),
@@ -67,17 +65,5 @@ public class ReactScrollViewHelper {
             contentView.getHeight(),
             scrollView.getWidth(),
             scrollView.getHeight()));
-  }
-
-  public static int parseOverScrollMode(String jsOverScrollMode) {
-    if (jsOverScrollMode == null || jsOverScrollMode.equals(AUTO)) {
-      return View.OVER_SCROLL_IF_CONTENT_SCROLLS;
-    } else if (jsOverScrollMode.equals(OVER_SCROLL_ALWAYS)) {
-      return View.OVER_SCROLL_ALWAYS;
-    } else if (jsOverScrollMode.equals(OVER_SCROLL_NEVER)) {
-      return View.OVER_SCROLL_NEVER;
-    } else {
-      throw new JSApplicationIllegalArgumentException("wrong overScrollMode: " + jsOverScrollMode);
-    }
   }
 }

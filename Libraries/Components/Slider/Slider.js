@@ -12,35 +12,31 @@
 'use strict';
 
 var Image = require('Image');
-var ColorPropType = require('ColorPropType');
 var NativeMethodsMixin = require('NativeMethodsMixin');
-var ReactNativeViewAttributes = require('ReactNativeViewAttributes');
 var Platform = require('Platform');
+var PropTypes = require('ReactPropTypes');
 var React = require('React');
 var StyleSheet = require('StyleSheet');
-const ViewPropTypes = require('ViewPropTypes');
+var View = require('View');
 
 var requireNativeComponent = require('requireNativeComponent');
-
-var PropTypes = React.PropTypes;
 
 type Event = Object;
 
 /**
  * A component used to select a single value from a range of values.
  */
-// $FlowFixMe(>=0.41.0)
 var Slider = React.createClass({
   mixins: [NativeMethodsMixin],
 
   propTypes: {
-    ...ViewPropTypes,
+    ...View.propTypes,
 
     /**
      * Used to style and layout the `Slider`.  See `StyleSheet.js` and
      * `ViewStylePropTypes.js` for more info.
      */
-    style: ViewPropTypes.style,
+    style: View.propTypes.style,
 
     /**
      * Initial value of the slider. The value should be between minimumValue
@@ -70,16 +66,18 @@ var Slider = React.createClass({
     maximumValue: PropTypes.number,
 
     /**
-     * The color used for the track to the left of the button.
-     * Overrides the default blue gradient image on iOS.
+     * The color used for the track to the left of the button. Overrides the
+     * default blue gradient image.
+     * @platform ios
      */
-    minimumTrackTintColor: ColorPropType,
+    minimumTrackTintColor: PropTypes.string,
 
     /**
-     * The color used for the track to the right of the button.
-     * Overrides the default blue gradient image on iOS.
+     * The color used for the track to the right of the button. Overrides the
+     * default blue gradient image.
+     * @platform ios
      */
-    maximumTrackTintColor: ColorPropType,
+    maximumTrackTintColor: PropTypes.string,
 
     /**
      * If true the user won't be able to move the slider.
@@ -115,12 +113,6 @@ var Slider = React.createClass({
     thumbImage: Image.propTypes.source,
 
     /**
-     * Color of the foreground switch grip.
-     * @platform android
-     */
-    thumbTintColor: ColorPropType,
-
-    /**
      * Callback continuously called while the user is dragging the slider.
      */
     onValueChange: PropTypes.func,
@@ -147,16 +139,8 @@ var Slider = React.createClass({
     };
   },
 
-  viewConfig: {
-    uiViewClassName: 'RCTSlider',
-    validAttributes: {
-      ...ReactNativeViewAttributes.RCTView,
-      value: true
-    }
-  },
-
   render: function() {
-    const {style, onValueChange, onSlidingComplete, ...props} = this.props;
+    let {style, onValueChange, onSlidingComplete, ...props} = this.props;
     props.style = [styles.slider, style];
 
     props.onValueChange = onValueChange && ((event: Event) => {
@@ -175,7 +159,7 @@ var Slider = React.createClass({
       onSlidingComplete && onSlidingComplete(event.nativeEvent.value);
     });
 
-    return <RCTSlider
+    return <RCTSlider 
       {...props}
       enabled={!this.props.disabled}
       onStartShouldSetResponder={() => true}

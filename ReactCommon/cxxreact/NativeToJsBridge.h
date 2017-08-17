@@ -7,15 +7,15 @@
 #include <map>
 #include <vector>
 
-#include <cxxreact/Executor.h>
-#include <cxxreact/ExecutorToken.h>
-#include <cxxreact/JSCExecutor.h>
-#include <cxxreact/JSModulesUnbundle.h>
-#include <cxxreact/MessageQueueThread.h>
-#include <cxxreact/MethodCall.h>
-#include <cxxreact/NativeModule.h>
 #include <folly/dynamic.h>
-#include <jschelpers/Value.h>
+
+#include "Executor.h"
+#include "ExecutorToken.h"
+#include "JSModulesUnbundle.h"
+#include "MessageQueueThread.h"
+#include "MethodCall.h"
+#include "NativeModule.h"
+#include "Value.h"
 
 namespace folly {
 
@@ -44,12 +44,9 @@ public:
 class JsToNativeBridge;
 
 // This class manages calls from native code to JS.  It also manages
-// executors and their threads.  All functions here can be called from
-// any thread.
-//
-// Except for loadApplicationScriptSync(), all void methods will queue
-// work to run on the jsQueue passed to the ctor, and return
-// immediately.
+// executors and their threads.  This part is used by both bridges for
+// now, but further refactorings should separate the bridges more
+// fully #11247981.
 class NativeToJsBridge {
 public:
   friend class JsToNativeBridge;
@@ -61,6 +58,7 @@ public:
       JSExecutorFactory* jsExecutorFactory,
       std::shared_ptr<ModuleRegistry> registry,
       std::shared_ptr<MessageQueueThread> jsQueue,
+      std::unique_ptr<MessageQueueThread> nativeQueue,
       std::shared_ptr<InstanceCallback> callback);
   virtual ~NativeToJsBridge();
 
@@ -70,58 +68,34 @@ public:
    */
   void callFunction(
     ExecutorToken executorToken,
-    std::string&& module,
-    std::string&& method,
-    folly::dynamic&& args);
+    const std::string& moduleId,
+    const std::string& methodId,
+    const folly::dynamic& args,
+    const std::string& tracingName);
 
   /**
    * Invokes a callback with the cbID, and optional additional arguments in JS.
    */
-  void invokeCallback(ExecutorToken executorToken, double callbackId, folly::dynamic&& args);
+  void invokeCallback(ExecutorToken executorToken, const double callbackId, const folly::dynamic& args);
 
   /**
-   * Executes a JS method on the given executor synchronously, returning its
-   * return value.  JSException will be thrown if JS throws an exception;
-   * another standard exception may be thrown for C++ bridge failures, or if
-   * the executor is not capable of synchronous calls.
-   *
-   * This method is experimental, and may be modified or removed.
-   *
-   * loadApplicationScriptSync() must be called and finished executing
-   * before callFunctionSync().
+   * Starts the JS application from an "bundle", i.e. a JavaScript file that
+   * contains code for all modules and a runtime that resolves and
+   * executes modules.
    */
-  template <typename T>
-  Value callFunctionSync(const std::string& module, const std::string& method, T&& args) {
-    if (*m_destroyed) {
-      throw std::logic_error(
-        folly::to<std::string>("Synchronous call to ", module, ".", method,
-                               " after bridge is destroyed"));
-    }
-
-    JSCExecutor *jscExecutor = dynamic_cast<JSCExecutor*>(m_mainExecutor);
-    if (!jscExecutor) {
-      throw std::invalid_argument(
-        folly::to<std::string>("Executor type ", typeid(*m_mainExecutor).name(),
-                               " does not support synchronous calls"));
-    }
-
-    return jscExecutor->callFunctionSync(module, method, std::forward<T>(args));
-  }
+  void loadApplicationScript(std::unique_ptr<const JSBigString> script, std::string sourceURL);
 
   /**
-   * Starts the JS application.  If unbundle is non-null, then it is
-   * used to fetch JavaScript modules as individual scripts.
-   * Otherwise, the script is assumed to include all the modules.
+   * An "unbundle" is a backend that stores and injects JavaScript modules as
+   * individual scripts, rather than bundling all of them into a single scrupt.
+   *
+   * Loading an unbundle means setting the storage backend and executing the
+   * startup script.
    */
-  void loadApplication(
+  void loadApplicationUnbundle(
     std::unique_ptr<JSModulesUnbundle> unbundle,
     std::unique_ptr<const JSBigString> startupCode,
     std::string sourceURL);
-  void loadApplicationSync(
-    std::unique_ptr<JSModulesUnbundle> unbundle,
-    std::unique_ptr<const JSBigString> startupCode,
-    std::string sourceURL);
-
   void setGlobalVariable(std::string propName, std::unique_ptr<const JSBigString> jsonValue);
   void* getJavaScriptContext();
   bool supportsProfiling();

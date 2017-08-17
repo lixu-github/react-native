@@ -15,10 +15,36 @@ var path = require('path');
 var sharedBlacklist = [
   /node_modules[/\\]react[/\\]dist[/\\].*/,
 
+  'downstream/core/invariant.js',
+
   /website\/node_modules\/.*/,
 
-  /heapCapture\/bundle\.js/,
+  // TODO(jkassens, #9876132): Remove this rule when it's no longer needed.
+  'Libraries/Relay/relay/tools/relayUnstableBatchedUpdates.js',
 ];
+
+var platformBlacklists = {
+  web: [
+    '.ios.js',
+    '.android.js',
+    '.windows.js'
+  ],
+  ios: [
+    '.web.js',
+    '.android.js',
+    '.windows.js',
+  ],
+  android: [
+    '.web.js',
+    '.ios.js',
+    '.windows.js'
+  ],
+  windows: [
+    '.web.js',
+    '.ios.js',
+    '.android.js'
+  ],
+};
 
 function escapeRegExp(pattern) {
   if (Object.prototype.toString.call(pattern) === '[object RegExp]') {
@@ -26,15 +52,16 @@ function escapeRegExp(pattern) {
   } else if (typeof pattern === 'string') {
     var escaped = pattern.replace(/[\-\[\]\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
     // convert the '/' into an escaped local file separator
-    return escaped.replace(/\//g, '\\' + path.sep);
+    return escaped.replace(/\//g,'\\' + path.sep);
   } else {
     throw new Error('Unexpected packager blacklist pattern: ' + pattern);
   }
 }
 
-function blacklist(additionalBlacklist) {
+function blacklist(platform, additionalBlacklist) {
   return new RegExp('(' +
     (additionalBlacklist || []).concat(sharedBlacklist)
+      .concat(platformBlacklists[platform] || [])
       .map(escapeRegExp)
       .join('|') +
     ')$'

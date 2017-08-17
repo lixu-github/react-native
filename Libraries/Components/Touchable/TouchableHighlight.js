@@ -23,17 +23,16 @@ var Touchable = require('Touchable');
 var TouchableWithoutFeedback = require('TouchableWithoutFeedback');
 var View = require('View');
 
-const ViewPropTypes = require('ViewPropTypes');
-
 var ensureComponentIsNative = require('ensureComponentIsNative');
 var ensurePositiveDelayProps = require('ensurePositiveDelayProps');
 var keyOf = require('fbjs/lib/keyOf');
 var merge = require('merge');
+var onlyChild = require('onlyChild');
 
 type Event = Object;
 
 var DEFAULT_PROPS = {
-  activeOpacity: 0.85,
+  activeOpacity: 0.8,
   underlayColor: 'black',
 };
 
@@ -42,15 +41,10 @@ var PRESS_RETENTION_OFFSET = {top: 20, left: 20, right: 20, bottom: 30};
 /**
  * A wrapper for making views respond properly to touches.
  * On press down, the opacity of the wrapped view is decreased, which allows
- * the underlay color to show through, darkening or tinting the view.
- *
- * The underlay comes from wrapping the child in a new View, which can affect
- * layout, and sometimes cause unwanted visual artifacts if not used correctly,
- * for example if the backgroundColor of the wrapped view isn't explicitly set
- * to an opaque color.
- *
- * TouchableHighlight must have one child (not zero or more than one).
- * If you wish to have several child components, wrap them in a View.
+ * the underlay color to show through, darkening or tinting the view.  The
+ * underlay comes from adding a view to the view hierarchy, which can sometimes
+ * cause unwanted visual artifacts if not used correctly, for example if the
+ * backgroundColor of the wrapped view isn't explicitly set to an opaque color.
  *
  * Example:
  *
@@ -60,12 +54,15 @@ var PRESS_RETENTION_OFFSET = {top: 20, left: 20, right: 20, bottom: 30};
  *     <TouchableHighlight onPress={this._onPressButton}>
  *       <Image
  *         style={styles.button}
- *         source={require('./myButton.png')}
+ *         source={require('image!myButton')}
  *       />
  *     </TouchableHighlight>
  *   );
  * },
  * ```
+ * > **NOTE**: TouchableHighlight supports only one child
+ * >
+ * > If you wish to have several child components, wrap them in a View.
  */
 
 var TouchableHighlight = React.createClass({
@@ -81,7 +78,7 @@ var TouchableHighlight = React.createClass({
      * active.
      */
     underlayColor: ColorPropType,
-    style: ViewPropTypes.style,
+    style: View.propTypes.style,
     /**
      * Called immediately after the underlay is shown
      */
@@ -90,25 +87,6 @@ var TouchableHighlight = React.createClass({
      * Called immediately after the underlay is hidden
      */
     onHideUnderlay: React.PropTypes.func,
-    /**
-     * *(Apple TV only)* TV preferred focus (see documentation for the View component).
-     *
-     * @platform ios
-     */
-    hasTVPreferredFocus: React.PropTypes.bool,
-    /**
-     * *(Apple TV only)* Object with properties to control Apple TV parallax effects.
-     *
-     * enabled: If true, parallax effects are enabled.  Defaults to true.
-     * shiftDistanceX: Defaults to 2.0.
-     * shiftDistanceY: Defaults to 2.0.
-     * tiltAngle: Defaults to 0.05.
-     * magnification: Defaults to 1.0.
-     *
-     * @platform ios
-     */
-    tvParallaxProperties: React.PropTypes.object,
-
   },
 
   mixins: [NativeMethodsMixin, TimerMixin, Touchable.Mixin],
@@ -131,8 +109,7 @@ var TouchableHighlight = React.createClass({
       underlayStyle: [
         INACTIVE_UNDERLAY_PROPS.style,
         props.style,
-      ],
-      hasTVPreferredFocus: props.hasTVPreferredFocus
+      ]
     };
   },
 
@@ -250,7 +227,7 @@ var TouchableHighlight = React.createClass({
   render: function() {
     return (
       <View
-        accessible={this.props.accessible !== false}
+        accessible={true}
         accessibilityLabel={this.props.accessibilityLabel}
         accessibilityComponentType={this.props.accessibilityComponentType}
         accessibilityTraits={this.props.accessibilityTraits}
@@ -258,9 +235,6 @@ var TouchableHighlight = React.createClass({
         style={this.state.underlayStyle}
         onLayout={this.props.onLayout}
         hitSlop={this.props.hitSlop}
-        isTVSelectable={true}
-        tvParallaxProperties={this.props.tvParallaxProperties}
-        hasTVPreferredFocus={this.state.hasTVPreferredFocus}
         onStartShouldSetResponder={this.touchableHandleStartShouldSetResponder}
         onResponderTerminationRequest={this.touchableHandleResponderTerminationRequest}
         onResponderGrant={this.touchableHandleResponderGrant}
@@ -269,7 +243,7 @@ var TouchableHighlight = React.createClass({
         onResponderTerminate={this.touchableHandleResponderTerminate}
         testID={this.props.testID}>
         {React.cloneElement(
-          React.Children.only(this.props.children),
+          onlyChild(this.props.children),
           {
             ref: CHILD_REF,
           }

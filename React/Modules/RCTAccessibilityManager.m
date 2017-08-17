@@ -64,14 +64,14 @@ RCT_EXPORT_MODULE()
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(didReceiveNewContentSizeCategory:)
                                                  name:UIContentSizeCategoryDidChangeNotification
-                                               object:RCTSharedApplication()];
+                                               object:[UIApplication sharedApplication]];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(didReceiveNewVoiceOverStatus:)
                                                  name:UIAccessibilityVoiceOverStatusChanged
                                                object:nil];
 
-    self.contentSizeCategory = RCTSharedApplication().preferredContentSizeCategory;
+    self.contentSizeCategory = [UIApplication sharedApplication].preferredContentSizeCategory;
     _isVoiceOverEnabled = UIAccessibilityIsVoiceOverRunning();
   }
   return self;

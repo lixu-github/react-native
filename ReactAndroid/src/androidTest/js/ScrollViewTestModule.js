@@ -26,8 +26,8 @@ var NUM_ITEMS = 100;
 
 var scrollViewApp;
 
-class Item extends React.Component {
-  render() {
+var Item = React.createClass({
+  render: function() {
     return (
       <TouchableWithoutFeedback onPress={this.props.onPress}>
         <View style={styles.item_container}>
@@ -35,8 +35,8 @@ class Item extends React.Component {
         </View>
       </TouchableWithoutFeedback>
     );
-  }
-}
+  },
+});
 
 var getInitialState = function() {
   var data = [];

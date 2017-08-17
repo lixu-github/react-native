@@ -7,16 +7,12 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule RCTNetworking
- * @flow
  */
 'use strict';
 
 const FormData = require('FormData');
 const NativeEventEmitter = require('NativeEventEmitter');
 const RCTNetworkingNative = require('NativeModules').Networking;
-const convertRequestBody = require('convertRequestBody');
-
-import type {RequestBody} from 'convertRequestBody';
 
 class RCTNetworking extends NativeEventEmitter {
 
@@ -24,37 +20,28 @@ class RCTNetworking extends NativeEventEmitter {
     super(RCTNetworkingNative);
   }
 
-  sendRequest(
-    method: string,
-    trackingName: string,
-    url: string,
-    headers: Object,
-    data: RequestBody,
-    responseType: 'text' | 'base64',
-    incrementalUpdates: boolean,
-    timeout: number,
-    callback: (requestId: number) => any,
-    withCredentials: boolean
-  ) {
-    const body = convertRequestBody(data);
+  sendRequest(method, url, headers, data, incrementalUpdates, timeout, callback) {
+    if (typeof data === 'string') {
+      data = {string: data};
+    } else if (data instanceof FormData) {
+      data = {formData: data.getParts()};
+    }
     RCTNetworkingNative.sendRequest({
       method,
       url,
-      data: {...body, trackingName},
+      data,
       headers,
-      responseType,
       incrementalUpdates,
-      timeout,
-      withCredentials
+      timeout
     }, callback);
   }
 
-  abortRequest(requestId: number) {
+  abortRequest(requestId) {
     RCTNetworkingNative.abortRequest(requestId);
   }
 
-  clearCookies(callback: (result: boolean) => any) {
-    RCTNetworkingNative.clearCookies(callback);
+  clearCookies(callback) {
+    console.warn('RCTNetworking.clearCookies is not supported on iOS');
   }
 }
 

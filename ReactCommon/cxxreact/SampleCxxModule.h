@@ -23,7 +23,6 @@ public:
   std::map<std::string, std::string> load();
   void call_later(int msec, std::function<void()> f);
   void except();
-  double twice(double n);
 
 private:
   std::map<std::string, std::string> state_;

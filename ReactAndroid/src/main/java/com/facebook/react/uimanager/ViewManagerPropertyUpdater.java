@@ -13,7 +13,7 @@ import com.facebook.react.bridge.ReadableMapKeySetIterator;
 
 public class ViewManagerPropertyUpdater {
   public interface Settable {
-     void getProperties(Map<String, String> props);
+    Map<String, String> getProperties();
   }
 
   public interface ViewManagerSetter<T extends ViewManager, V extends View> extends Settable {
@@ -57,8 +57,8 @@ public class ViewManagerPropertyUpdater {
       Class<? extends ViewManager> viewManagerTopClass,
       Class<? extends ReactShadowNode> shadowNodeTopClass) {
     Map<String, String> props = new HashMap<>();
-    findManagerSetter(viewManagerTopClass).getProperties(props);
-    findNodeSetter(shadowNodeTopClass).getProperties(props);
+    props.putAll(findManagerSetter(viewManagerTopClass).getProperties());
+    props.putAll(findNodeSetter(shadowNodeTopClass).getProperties());
     return props;
   }
 
@@ -125,10 +125,12 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public void getProperties(Map<String, String> props) {
+    public Map<String, String> getProperties() {
+      Map<String, String> nativeProps = new HashMap<>();
       for (ViewManagersPropertyCache.PropSetter setter : mPropSetters.values()) {
-        props.put(setter.getPropName(), setter.getPropType());
+        nativeProps.put(setter.getPropName(), setter.getPropType());
       }
+      return nativeProps;
     }
   }
 
@@ -150,10 +152,12 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public void getProperties(Map<String, String> props) {
+    public Map<String, String> getProperties() {
+      Map<String, String> nativeProps = new HashMap<>();
       for (ViewManagersPropertyCache.PropSetter setter : mPropSetters.values()) {
-        props.put(setter.getPropName(), setter.getPropType());
+        nativeProps.put(setter.getPropName(), setter.getPropType());
       }
+      return nativeProps;
     }
   }
 }

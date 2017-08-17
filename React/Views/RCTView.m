@@ -81,17 +81,11 @@
 
 static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
 {
-  BOOL isFirstIteration = YES;
   NSMutableString *str = [NSMutableString stringWithString:@""];
   for (UIView *subview in view.subviews) {
-    if (isFirstIteration) {
-      isFirstIteration = NO;
-    } else {
-      [str appendString:@" "];
-    }
-    
     NSString *label = subview.accessibilityLabel;
     if (label) {
+      [str appendString:@" "];
       [str appendString:label];
     } else {
       [str appendString:RCTRecursiveAccessibilityLabel(subview)];
@@ -129,18 +123,6 @@ static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
 }
 
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
-
-- (void)setReactLayoutDirection:(UIUserInterfaceLayoutDirection)layoutDirection
-{
-  _reactLayoutDirection = layoutDirection;
-
-  if ([self respondsToSelector:@selector(setSemanticContentAttribute:)]) {
-    self.semanticContentAttribute =
-      layoutDirection == UIUserInterfaceLayoutDirectionLeftToRight ?
-        UISemanticContentAttributeForceLeftToRight :
-        UISemanticContentAttributeForceRightToLeft;
-  }
-}
 
 - (NSString *)accessibilityLabel
 {
@@ -495,7 +477,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
   // the content. For this reason, only use iOS border drawing when clipping
   // or when the border is hidden.
 
-  (borderInsets.top == 0 || (borderColors.top && CGColorGetAlpha(borderColors.top) == 0) || self.clipsToBounds);
+  (borderInsets.top == 0 || CGColorGetAlpha(borderColors.top) == 0 || self.clipsToBounds);
 
   // iOS clips to the outside of the border, but CSS clips to the inside. To
   // solve this, we'll need to add a container view inside the main view to
@@ -593,10 +575,10 @@ static void RCTUpdateShadowPathForView(RCTView *view)
       // Can't accurately calculate box shadow, so fall back to pixel-based shadow
       view.layer.shadowPath = nil;
 
-      RCTLogAdvice(@"View #%@ of type %@ has a shadow set but cannot calculate "
-        "shadow efficiently. Consider setting a background color to "
-        "fix this, or apply the shadow to a more specific component.",
-        view.reactTag, [view class]);
+      RCTLogWarn(@"View #%@ of type %@ has a shadow set but cannot calculate "
+                 "shadow efficiently. Consider setting a background color to "
+                 "fix this, or apply the shadow to a more specific component.",
+                 view.reactTag, [view class]);
     }
   }
 }

@@ -14,26 +14,17 @@ Object.values || require('core-js/fn/object/values');
 
 var _only = [];
 
-function registerOnly(onlyList) {
-  require('babel-register')(config(onlyList));
-}
-
-function config(onlyList) {
+module.exports = function(onlyList) {
   _only = _only.concat(onlyList);
-  return {
+
+  require('babel-register')({
     presets: ['es2015-node'],
     plugins: [
       'transform-flow-strip-types',
       'syntax-trailing-function-commas',
       'transform-object-rest-spread',
-      'transform-async-to-generator',
     ],
     only: _only,
-    retainLines: true,
     sourceMaps: 'inline',
-    babelrc: false,
-  };
-}
-
-module.exports = exports = registerOnly;
-exports.config = config;
+  });
+};

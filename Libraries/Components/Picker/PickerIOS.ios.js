@@ -14,12 +14,11 @@
 
 var NativeMethodsMixin = require('NativeMethodsMixin');
 var React = require('React');
+var ReactChildren = require('ReactChildren');
 var StyleSheet = require('StyleSheet');
 var StyleSheetPropType = require('StyleSheetPropType');
 var TextStylePropTypes = require('TextStylePropTypes');
 var View = require('View');
-const ViewPropTypes = require('ViewPropTypes');
-var processColor = require('processColor');
 
 var itemStylePropType = StyleSheetPropType(TextStylePropTypes);
 var requireNativeComponent = require('requireNativeComponent');
@@ -28,7 +27,7 @@ var PickerIOS = React.createClass({
   mixins: [NativeMethodsMixin],
 
   propTypes: {
-    ...ViewPropTypes,
+    ...View.propTypes,
     itemStyle: itemStylePropType,
     onValueChange: React.PropTypes.func,
     selectedValue: React.PropTypes.any, // string or integer basically
@@ -46,15 +45,11 @@ var PickerIOS = React.createClass({
   _stateFromProps: function(props) {
     var selectedIndex = 0;
     var items = [];
-    React.Children.toArray(props.children).forEach(function (child, index) {
+    ReactChildren.forEach(props.children, function (child, index) {
       if (child.props.value === props.selectedValue) {
         selectedIndex = index;
       }
-      items.push({
-        value: child.props.value,
-        label: child.props.label,
-        textColor: processColor(child.props.color),
-      });
+      items.push({value: child.props.value, label: child.props.label});
     });
     return {selectedIndex, items};
   },
@@ -68,8 +63,6 @@ var PickerIOS = React.createClass({
           items={this.state.items}
           selectedIndex={this.state.selectedIndex}
           onChange={this._onChange}
-          onStartShouldSetResponder={() => true}
-          onResponderTerminationRequest={() => false}
         />
       </View>
     );
@@ -97,18 +90,17 @@ var PickerIOS = React.createClass({
   },
 });
 
-PickerIOS.Item = class extends React.Component {
-  static propTypes = {
+PickerIOS.Item = React.createClass({
+  propTypes: {
     value: React.PropTypes.any, // string or integer basically
     label: React.PropTypes.string,
-    color: React.PropTypes.string,
-  };
+  },
 
-  render() {
+  render: function() {
     // These items don't get rendered directly.
     return null;
-  }
-};
+  },
+});
 
 var styles = StyleSheet.create({
   pickerIOS: {

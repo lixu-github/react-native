@@ -11,9 +11,10 @@
  */
 'use strict';
 
+var ReactPropTypes = require('ReactPropTypes');
 var deprecatedPropType = require('deprecatedPropType');
 
-var ReactPropTypes = require('React').PropTypes;
+var ArrayOfNumberPropType = ReactPropTypes.arrayOf(ReactPropTypes.number);
 
 var TransformMatrixPropType = function(
   props : Object,

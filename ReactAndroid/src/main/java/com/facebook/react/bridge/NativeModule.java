@@ -9,6 +9,7 @@
 
 package com.facebook.react.bridge;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -20,8 +21,15 @@ import java.util.Map;
  */
 public interface NativeModule {
   interface NativeMethod {
-    void invoke(JSInstance jsInstance, ExecutorToken executorToken, ReadableNativeArray parameters);
+    void invoke(CatalystInstance catalystInstance, ExecutorToken executorToken, ReadableNativeArray parameters);
     String getType();
+  }
+
+  /**
+   * A method that can be called from JS synchronously on the JS thread and return a result.
+   * @see ReactSyncHook
+   */
+  interface SyncNativeHook {
   }
 
   /**
@@ -34,6 +42,12 @@ public interface NativeModule {
    * @return methods callable from JS on this module
    */
   Map<String, NativeMethod> getMethods();
+
+  /**
+   * Append a field which represents the constants this module exports
+   * to JS.  If no constants are exported this should do nothing.
+   */
+  void writeConstantsField(JsonWriter writer, String fieldName) throws IOException;
 
   /**
    * This is called at the end of {@link CatalystApplicationFragment#createCatalystInstance()}
@@ -49,6 +63,15 @@ public interface NativeModule {
    * default all modules return false.
    */
   boolean canOverrideExistingModule();
+
+  /**
+   * Called on the JS thread after a ReactBridge has been created. This is useful for native modules
+   * that need to do any setup before the JS bundle has been loaded. An example of this would be
+   * installing custom functionality into the JavaScriptCore context.
+   *
+   * @param bridge the ReactBridge instance that has just been created
+   */
+  void onReactBridgeInitialized(ReactBridge bridge);
 
   /**
    * Called before {CatalystInstance#onHostDestroy}

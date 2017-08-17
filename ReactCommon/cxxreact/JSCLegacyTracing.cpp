@@ -4,16 +4,15 @@
 
 #include "JSCLegacyTracing.h"
 
-#include <fbsystrace.h>
+#include <JavaScriptCore/JavaScript.h>
 #include <JavaScriptCore/API/JSProfilerPrivate.h>
-#include <jschelpers/JSCHelpers.h>
-#include <jschelpers/Value.h>
 
+#include <fbsystrace.h>
+
+#include "JSCHelpers.h"
 #include "JSCTracing.h"
 
 static const char *ENABLED_FBSYSTRACE_PROFILE_NAME = "__fbsystrace__";
-
-using namespace facebook::react;
 
 static JSValueRef nativeTraceBeginLegacy(
     JSContextRef ctx,
@@ -23,20 +22,21 @@ static JSValueRef nativeTraceBeginLegacy(
     const JSValueRef arguments[],
     JSValueRef* exception) {
   if (FBSYSTRACE_LIKELY(argumentCount >= 1)) {
-    uint64_t tag = tracingTagFromJSValue(ctx, arguments[0], exception);
+    uint64_t tag = facebook::react::tracingTagFromJSValue(ctx, arguments[0], exception);
     if (!fbsystrace_is_tracing(tag)) {
-      return Value::makeUndefined(ctx);
+      return JSValueMakeUndefined(ctx);
     }
   }
 
-  String title(ctx, ENABLED_FBSYSTRACE_PROFILE_NAME);
+  JSStringRef title = JSStringCreateWithUTF8CString(ENABLED_FBSYSTRACE_PROFILE_NAME);
   #if WITH_REACT_INTERNAL_SETTINGS
   JSStartProfiling(ctx, title, true);
   #else
   JSStartProfiling(ctx, title);
   #endif
+  JSStringRelease(title);
 
-  return Value::makeUndefined(ctx);
+  return JSValueMakeUndefined(ctx);
 }
 
 static JSValueRef nativeTraceEndLegacy(
@@ -47,16 +47,17 @@ static JSValueRef nativeTraceEndLegacy(
     const JSValueRef arguments[],
     JSValueRef* exception) {
   if (FBSYSTRACE_LIKELY(argumentCount >= 1)) {
-    uint64_t tag = tracingTagFromJSValue(ctx, arguments[0], exception);
+    uint64_t tag = facebook::react::tracingTagFromJSValue(ctx, arguments[0], exception);
     if (!fbsystrace_is_tracing(tag)) {
-      return Value::makeUndefined(ctx);
+      return JSValueMakeUndefined(ctx);
     }
   }
 
-  String title(ctx, ENABLED_FBSYSTRACE_PROFILE_NAME);
+  JSStringRef title = JSStringCreateWithUTF8CString(ENABLED_FBSYSTRACE_PROFILE_NAME);
   JSEndProfiling(ctx, title);
+  JSStringRelease(title);
 
-  return Value::makeUndefined(ctx);
+  return JSValueMakeUndefined(ctx);
 }
 
 namespace facebook {

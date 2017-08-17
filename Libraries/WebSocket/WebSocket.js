@@ -15,12 +15,23 @@ const NativeEventEmitter = require('NativeEventEmitter');
 const Platform = require('Platform');
 const RCTWebSocketModule = require('NativeModules').WebSocketModule;
 const WebSocketEvent = require('WebSocketEvent');
-const binaryToBase64 = require('binaryToBase64');
 
 const EventTarget = require('event-target-shim');
 const base64 = require('base64-js');
 
 import type EventSubscription from 'EventSubscription';
+
+type ArrayBufferView =
+  Int8Array |
+  Uint8Array |
+  Uint8ClampedArray |
+  Int16Array |
+  Uint16Array |
+  Int32Array |
+  Uint32Array |
+  Float32Array |
+  Float64Array |
+  DataView;
 
 const CONNECTING = 0;
 const OPEN = 1;
@@ -83,8 +94,8 @@ class WebSocket extends EventTarget(...WEBSOCKET_EVENTS) {
 
     this._eventEmitter = new NativeEventEmitter(RCTWebSocketModule);
     this._socketId = nextWebSocketId++;
-    this._registerEvents();
     RCTWebSocketModule.connect(url, protocols, options, this._socketId);
+    this._registerEvents();
   }
 
   close(code?: number, reason?: string): void {
@@ -97,7 +108,7 @@ class WebSocket extends EventTarget(...WEBSOCKET_EVENTS) {
     this._close(code, reason);
   }
 
-  send(data: string | ArrayBuffer | $ArrayBufferView): void {
+  send(data: string | ArrayBuffer | ArrayBufferView): void {
     if (this.readyState === this.CONNECTING) {
       throw new Error('INVALID_STATE_ERR');
     }
@@ -107,20 +118,21 @@ class WebSocket extends EventTarget(...WEBSOCKET_EVENTS) {
       return;
     }
 
-    if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
-      RCTWebSocketModule.sendBinary(binaryToBase64(data), this._socketId);
-      return;
+    // Maintain iOS 7 compatibility which doesn't have JS typed arrays.
+    if (typeof ArrayBuffer !== 'undefined' &&
+        typeof Uint8Array !== 'undefined') {
+      if (ArrayBuffer.isView(data)) {
+        // $FlowFixMe: no way to assert that 'data' is indeed an ArrayBufferView now
+        data = data.buffer;
+      }
+      if (data instanceof ArrayBuffer) {
+        data = base64.fromByteArray(new Uint8Array(data));
+        RCTWebSocketModule.sendBinary(data, this._socketId);
+        return;
+      }
     }
 
     throw new Error('Unsupported data type');
-  }
-
-  ping(): void {
-    if (this.readyState === this.CONNECTING) {
-        throw new Error('INVALID_STATE_ERR');
-    }
-
-    RCTWebSocketModule.ping(this._socketId);
   }
 
   _close(code?: number, reason?: string): void {
@@ -172,7 +184,6 @@ class WebSocket extends EventTarget(...WEBSOCKET_EVENTS) {
         if (ev.id !== this._socketId) {
           return;
         }
-        this.readyState = this.CLOSED;
         this.dispatchEvent(new WebSocketEvent('error', {
           message: ev.message,
         }));

@@ -13,23 +13,21 @@
 
 var Image = require('Image');
 var NativeMethodsMixin = require('NativeMethodsMixin');
+var PropTypes = require('ReactPropTypes');
 var React = require('React');
 var StyleSheet = require('StyleSheet');
-const ViewPropTypes = require('ViewPropTypes');
+var View = require('View');
 
 var requireNativeComponent = require('requireNativeComponent');
-
-var PropTypes = React.PropTypes;
 
 /**
  * Use `ProgressViewIOS` to render a UIProgressView on iOS.
  */
-// $FlowFixMe(>=0.41.0)
 var ProgressViewIOS = React.createClass({
   mixins: [NativeMethodsMixin],
 
   propTypes: {
-    ...ViewPropTypes,
+    ...View.propTypes,
     /**
      * The progress bar style.
      */

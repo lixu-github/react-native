@@ -11,20 +11,17 @@
  */
 'use strict';
 
-var ColorPropType = require('ColorPropType');
 var Image = require('Image');
 var React = require('React');
 var StaticContainer = require('StaticContainer.react');
 var StyleSheet = require('StyleSheet');
 var View = require('View');
 
-const ViewPropTypes = require('ViewPropTypes');
-
 var requireNativeComponent = require('requireNativeComponent');
 
-class TabBarItemIOS extends React.Component {
-  static propTypes = {
-    ...ViewPropTypes,
+var TabBarItemIOS = React.createClass({
+  propTypes: {
+    ...View.propTypes,
     /**
      * Little red bubble that sits at the top right of the icon.
      */
@@ -32,10 +29,6 @@ class TabBarItemIOS extends React.Component {
       React.PropTypes.string,
       React.PropTypes.number,
     ]),
-    /**
-     * Background color for the badge. Available since iOS 10.
-     */
-    badgeColor: ColorPropType,
     /**
      * Items comes with a few predefined system icons. Note that if you are
      * using them, the title and selectedIcon will be overridden with the
@@ -82,38 +75,33 @@ class TabBarItemIOS extends React.Component {
     /**
      * React style object.
      */
-    style: ViewPropTypes.style,
+    style: View.propTypes.style,
     /**
      * Text that appears under the icon. It is ignored when a system icon
      * is defined.
      */
     title: React.PropTypes.string,
-    /**
-     *(Apple TV only)* When set to true, this view will be focusable
-     * and navigable using the Apple TV remote.
-     *
-     * @platform ios
-     */
-    isTVSelectable: React.PropTypes.bool,
-  };
+  },
 
-  state = {
-    hasBeenSelected: false,
-  };
+  getInitialState: function() {
+    return {
+      hasBeenSelected: false,
+    };
+  },
 
-  componentWillMount() {
+  componentWillMount: function() {
     if (this.props.selected) {
       this.setState({hasBeenSelected: true});
     }
-  }
+  },
 
-  componentWillReceiveProps(nextProps: { selected?: boolean }) {
+  componentWillReceiveProps: function(nextProps: { selected?: boolean }) {
     if (this.state.hasBeenSelected || nextProps.selected) {
       this.setState({hasBeenSelected: true});
     }
-  }
+  },
 
-  render() {
+  render: function() {
     var {style, children, ...props} = this.props;
 
     // if the tab has already been shown once, always continue to show it so we
@@ -135,7 +123,7 @@ class TabBarItemIOS extends React.Component {
       </RCTTabBarItem>
     );
   }
-}
+});
 
 var styles = StyleSheet.create({
   tab: {

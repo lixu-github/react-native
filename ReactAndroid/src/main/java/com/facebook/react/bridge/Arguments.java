@@ -154,6 +154,9 @@ public class Arguments {
     }
 
     ReadableMapKeySetIterator iterator = readableMap.keySetIterator();
+    if (!iterator.hasNextKey()) {
+      return null;
+    }
 
     Bundle bundle = new Bundle();
     while (iterator.hasNextKey()) {

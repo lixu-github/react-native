@@ -13,10 +13,6 @@
 
 using namespace std::placeholders;
 
-namespace facebook { namespace react {
-  class Instance;
-}}
-
 namespace facebook { namespace xplat { namespace module {
 
 /**
@@ -46,24 +42,13 @@ namespace facebook { namespace xplat { namespace module {
  */
 
 class CxxModule {
-  class AsyncTagType {};
-  class SyncTagType {};
-
 public:
-  typedef std::function<std::unique_ptr<CxxModule>()> Provider;
-
   typedef std::function<void(std::vector<folly::dynamic>)> Callback;
-
-  constexpr static AsyncTagType AsyncTag = AsyncTagType();
-  constexpr static SyncTagType SyncTag = SyncTagType();
 
   struct Method {
     std::string name;
-
     size_t callbacks;
     std::function<void(folly::dynamic, Callback, Callback)> func;
-
-    std::function<folly::dynamic(folly::dynamic)> syncFunc;
 
     // std::function/lambda ctors
 
@@ -116,29 +101,6 @@ public:
       : name(std::move(aname))
       , callbacks(2)
       , func(std::bind(method, t, _1, _2, _3)) {}
-
-    // sync std::function/lambda ctors
-
-    // Overloads for functions returning void give ambiguity errors.
-    // I am not sure if this is a runtime/compiler bug, or a
-    // limitation I do not understand.
-
-    Method(std::string aname,
-           std::function<folly::dynamic()>&& afunc,
-           SyncTagType)
-      : name(std::move(aname))
-      , callbacks(0)
-      , syncFunc([afunc=std::move(afunc)] (const folly::dynamic&)
-                 { return afunc(); })
-    {}
-
-    Method(std::string aname,
-           std::function<folly::dynamic(folly::dynamic)>&& afunc,
-           SyncTagType)
-      : name(std::move(aname))
-      , callbacks(0)
-      , syncFunc(std::move(afunc))
-      {}
   };
 
   /**
@@ -163,26 +125,6 @@ public:
    * @return a list of methods this module exports to JS.
    */
   virtual auto getMethods() -> std::vector<Method> = 0;
-
-  /**
-   *  Called during the construction of CxxNativeModule.
-   */
-  void setInstance(std::weak_ptr<react::Instance> instance) {
-    instance_ = instance;
-  }
-
-  /**
-   * @return a weak_ptr to the current instance of the bridge.
-   * When used with CxxNativeModule, this gives Cxx modules access to functions
-   * such as `callJSFunction`, allowing them to communicate back to JS outside
-   * of the regular callbacks.
-   */
-  std::weak_ptr<react::Instance> getInstance() {
-    return instance_;
-  }
-
-private:
-  std::weak_ptr<react::Instance> instance_;
 };
 
 }}}

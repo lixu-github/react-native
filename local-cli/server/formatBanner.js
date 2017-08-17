@@ -45,7 +45,7 @@ var BOTTOM_RIGHT = '\u2518';
 function formatBanner(message, options) {
   options = options || {};
   _.defaults(options, {
-    chalkFunction: _.identity,
+    chalkFunction: (fn) => fn,
     width: 80,
     marginLeft: 0,
     marginRight: 0,

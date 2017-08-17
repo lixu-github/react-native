@@ -9,115 +9,130 @@
 
 package com.facebook.react.cxxbridge;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-import com.facebook.infer.annotation.Assertions;
-import com.facebook.react.bridge.JSInstance;
+import javax.annotation.Nullable;
+
+import com.facebook.react.bridge.BaseJavaModule;
+import com.facebook.react.bridge.CatalystInstance;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.OnBatchCompleteListener;
-import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.ReactMarker;
-import com.facebook.react.bridge.ReactMarkerConstants;
+import com.facebook.react.bridge.ReadableNativeArray;
+import com.facebook.react.common.MapBuilder;
+import com.facebook.react.common.SetBuilder;
+import com.facebook.infer.annotation.Assertions;
 import com.facebook.systrace.Systrace;
 
 /**
   * A set of Java APIs to expose to a particular JavaScript instance.
   */
 public class NativeModuleRegistry {
+  private final Map<Class<NativeModule>, NativeModule> mModuleInstances;
+  private final ArrayList<OnBatchCompleteListener> mBatchCompleteListenerModules;
 
-  private final ReactApplicationContext mReactApplicationContext;
-  private final Map<Class<? extends NativeModule>, ModuleHolder> mModules;
-  private final ArrayList<ModuleHolder> mBatchCompleteListenerModules;
-
-  public NativeModuleRegistry(
-    ReactApplicationContext reactApplicationContext,
-    Map<Class<? extends NativeModule>, ModuleHolder> modules,
-    ArrayList<ModuleHolder> batchCompleteListenerModules) {
-    mReactApplicationContext = reactApplicationContext;
-    mModules = modules;
-    mBatchCompleteListenerModules = batchCompleteListenerModules;
+  private NativeModuleRegistry(Map<Class<NativeModule>, NativeModule> moduleInstances) {
+    mModuleInstances = moduleInstances;
+    mBatchCompleteListenerModules = new ArrayList<OnBatchCompleteListener>(mModuleInstances.size());
+    for (NativeModule module : mModuleInstances.values()) {
+      if (module instanceof OnBatchCompleteListener) {
+        mBatchCompleteListenerModules.add((OnBatchCompleteListener) module);
+      }
+    }
   }
 
-  /* package */ Collection<JavaModuleWrapper> getJavaModules(
-      JSInstance jsInstance) {
+  /* package */ ModuleRegistryHolder getModuleRegistryHolder(
+      CatalystInstanceImpl catalystInstanceImpl) {
     ArrayList<JavaModuleWrapper> javaModules = new ArrayList<>();
-    for (Map.Entry<Class<? extends NativeModule>, ModuleHolder> entry : mModules.entrySet()) {
-      Class<?> type = entry.getKey();
-      if (!CxxModuleWrapper.class.isAssignableFrom(type)) {
-        javaModules.add(new JavaModuleWrapper(jsInstance, entry.getValue()));
+    ArrayList<CxxModuleWrapper> cxxModules = new ArrayList<>();
+    for (NativeModule module : mModuleInstances.values()) {
+      if (module instanceof BaseJavaModule) {
+        javaModules.add(new JavaModuleWrapper(catalystInstanceImpl, (BaseJavaModule) module));
+      } else if (module instanceof CxxModuleWrapper) {
+        cxxModules.add((CxxModuleWrapper) module);
+      } else {
+        throw new IllegalArgumentException("Unknown module type " + module.getClass());
       }
     }
-    return javaModules;
+    return new ModuleRegistryHolder(catalystInstanceImpl, javaModules, cxxModules);
   }
 
-  /* package */ Collection<ModuleHolder> getCxxModules() {
-    ArrayList<ModuleHolder> cxxModules = new ArrayList<>();
-    for (Map.Entry<Class<? extends NativeModule>, ModuleHolder> entry : mModules.entrySet()) {
-      Class<?> type = entry.getKey();
-      if (CxxModuleWrapper.class.isAssignableFrom(type)) {
-        cxxModules.add(entry.getValue());
-      }
-    }
-    return cxxModules;
-  }
-
-  /* package */ void notifyJSInstanceDestroy() {
-    mReactApplicationContext.assertOnNativeModulesQueueThread();
+  /* package */ void notifyCatalystInstanceDestroy() {
+    UiThreadUtil.assertOnUiThread();
     Systrace.beginSection(
         Systrace.TRACE_TAG_REACT_JAVA_BRIDGE,
-        "NativeModuleRegistry_notifyJSInstanceDestroy");
+        "NativeModuleRegistry_notifyCatalystInstanceDestroy");
     try {
-      for (ModuleHolder module : mModules.values()) {
-        module.destroy();
+      for (NativeModule nativeModule : mModuleInstances.values()) {
+        nativeModule.onCatalystInstanceDestroy();
       }
     } finally {
       Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
     }
   }
 
-  /* package */ void notifyJSInstanceInitialized() {
-    mReactApplicationContext.assertOnNativeModulesQueueThread("From version React Native v0.44, " +
-      "native modules are explicitly not initialized on the UI thread. See " +
-      "https://github.com/facebook/react-native/wiki/Breaking-Changes#d4611211-reactnativeandroidbreaking-move-nativemodule-initialization-off-ui-thread---aaachiuuu " +
-      " for more details.");
-    ReactMarker.logMarker(ReactMarkerConstants.NATIVE_MODULE_INITIALIZE_START);
+  /* package */ void notifyCatalystInstanceInitialized() {
+    UiThreadUtil.assertOnUiThread();
+
+    ReactMarker.logMarker("NativeModule_start");
     Systrace.beginSection(
         Systrace.TRACE_TAG_REACT_JAVA_BRIDGE,
-        "NativeModuleRegistry_notifyJSInstanceInitialized");
+        "NativeModuleRegistry_notifyCatalystInstanceInitialized");
     try {
-      for (ModuleHolder module : mModules.values()) {
-        module.initialize();
+      for (NativeModule nativeModule : mModuleInstances.values()) {
+        nativeModule.initialize();
       }
     } finally {
       Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
-      ReactMarker.logMarker(ReactMarkerConstants.NATIVE_MODULE_INITIALIZE_END);
+      ReactMarker.logMarker("NativeModule_end");
     }
   }
 
   public void onBatchComplete() {
-    for (ModuleHolder moduleHolder : mBatchCompleteListenerModules) {
-      if (moduleHolder.isInitialized()) {
-        ((OnBatchCompleteListener) moduleHolder.getModule()).onBatchComplete();
-      }
+    for (int i = 0; i < mBatchCompleteListenerModules.size(); i++) {
+      mBatchCompleteListenerModules.get(i).onBatchComplete();
     }
   }
 
   public <T extends NativeModule> boolean hasModule(Class<T> moduleInterface) {
-    return mModules.containsKey(moduleInterface);
+    return mModuleInstances.containsKey(moduleInterface);
   }
 
   public <T extends NativeModule> T getModule(Class<T> moduleInterface) {
-    return (T) Assertions.assertNotNull(mModules.get(moduleInterface)).getModule();
+    return (T) Assertions.assertNotNull(mModuleInstances.get(moduleInterface));
   }
 
-  public List<NativeModule> getAllModules() {
-    List<NativeModule> modules = new ArrayList<>();
-    for (ModuleHolder module : mModules.values()) {
-      modules.add(module.getModule());
+  public Collection<NativeModule> getAllModules() {
+    return mModuleInstances.values();
+  }
+
+  public static class Builder {
+    private final HashMap<String, NativeModule> mModules = MapBuilder.newHashMap();
+
+    public Builder add(NativeModule module) {
+      NativeModule existing = mModules.get(module.getName());
+      if (existing != null && !module.canOverrideExistingModule()) {
+        throw new IllegalStateException("Native module " + module.getClass().getSimpleName() +
+            " tried to override " + existing.getClass().getSimpleName() + " for module name " +
+            module.getName() + ". If this was your intention, return true from " +
+            module.getClass().getSimpleName() + "#canOverrideExistingModule()");
+      }
+      mModules.put(module.getName(), module);
+      return this;
     }
-    return modules;
+
+    public NativeModuleRegistry build() {
+      Map<Class<NativeModule>, NativeModule> moduleInstances = new HashMap<>();
+      for (NativeModule module : mModules.values()) {
+        moduleInstances.put((Class<NativeModule>)module.getClass(), module);
+      }
+      return new NativeModuleRegistry(moduleInstances);
+    }
   }
 }

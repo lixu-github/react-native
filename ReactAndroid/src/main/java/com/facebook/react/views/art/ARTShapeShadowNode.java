@@ -15,7 +15,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.DashPathEffect;
 
 import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
@@ -159,7 +158,8 @@ public class ARTShapeShadowNode extends ARTVirtualNode {
         (int) (mStrokeColor[1] * 255),
         (int) (mStrokeColor[2] * 255));
     if (mStrokeDash != null && mStrokeDash.length > 0) {
-      paint.setPathEffect(new DashPathEffect(mStrokeDash, 0));
+      // TODO(6352067): Support dashes
+      FLog.w(ReactConstants.TAG, "ART: Dashes are not supported yet!");
     }
     return true;
   }

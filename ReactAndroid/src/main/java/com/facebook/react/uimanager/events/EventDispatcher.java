@@ -17,14 +17,14 @@ import java.util.Comparator;
 import java.util.Map;
 
 import android.util.LongSparseArray;
+import android.view.Choreographer;
 
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.common.MapBuilder;
-import com.facebook.react.modules.core.ChoreographerCompat;
-import com.facebook.react.modules.core.ReactChoreographer;
+import com.facebook.react.uimanager.ReactChoreographer;
 import com.facebook.systrace.Systrace;
 
 /**
@@ -92,11 +92,10 @@ public class EventDispatcher implements LifecycleEventListener {
   private final Map<String, Short> mEventNameToEventId = MapBuilder.newHashMap();
   private final DispatchEventsRunnable mDispatchEventsRunnable = new DispatchEventsRunnable();
   private final ArrayList<Event> mEventStaging = new ArrayList<>();
-  private final ArrayList<EventDispatcherListener> mListeners = new ArrayList<>();
 
   private Event[] mEventsToDispatch = new Event[16];
   private int mEventsToDispatchSize = 0;
-  private volatile @Nullable RCTEventEmitter mRCTEventEmitter;
+  private @Nullable RCTEventEmitter mRCTEventEmitter;
   private final ScheduleDispatchFrameCallback mCurrentFrameCallback;
   private short mNextEventTypeId = 0;
   private volatile boolean mHasDispatchScheduled = false;
@@ -113,11 +112,6 @@ public class EventDispatcher implements LifecycleEventListener {
    */
   public void dispatchEvent(Event event) {
     Assertions.assertCondition(event.isInitialized(), "Dispatched event hasn't been initialized");
-
-    for (EventDispatcherListener listener : mListeners) {
-      listener.onEventDispatch(event);
-    }
-
     synchronized (mEventsStagingLock) {
       mEventStaging.add(event);
       Systrace.startAsyncFlow(
@@ -135,20 +129,6 @@ public class EventDispatcher implements LifecycleEventListener {
       // touch event dispatch will hit this codepath, and we simply queue them so that they
       // are dispatched once ReactContext creation completes and JS app is running.
     }
-  }
-
-  /**
-   * Add a listener to this EventDispatcher.
-   */
-  public void addListener(EventDispatcherListener listener) {
-    mListeners.add(listener);
-  }
-
-  /**
-   * Remove a listener from this EventDispatcher.
-   */
-  public void removeListener(EventDispatcherListener listener) {
-    mListeners.remove(listener);
   }
 
   @Override
@@ -171,12 +151,7 @@ public class EventDispatcher implements LifecycleEventListener {
   }
 
   public void onCatalystInstanceDestroyed() {
-    UiThreadUtil.runOnUiThread(new Runnable() {
-      @Override
-      public void run() {
-        stopFrameCallback();
-      }
-    });
+    stopFrameCallback();
   }
 
   private void stopFrameCallback() {
@@ -256,7 +231,7 @@ public class EventDispatcher implements LifecycleEventListener {
         (((long) coalescingKey) & 0xffff) << 48;
   }
 
-  private class ScheduleDispatchFrameCallback extends ChoreographerCompat.FrameCallback {
+  private class ScheduleDispatchFrameCallback implements Choreographer.FrameCallback {
     private volatile boolean mIsPosted = false;
     private boolean mShouldStop = false;
 

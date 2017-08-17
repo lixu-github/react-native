@@ -22,29 +22,20 @@ var ElementBox = require('ElementBox');
 var PropTypes = React.PropTypes;
 
 type EventLike = {
-  nativeEvent: Object,
+  nativeEvent: Object;
 };
 
-class InspectorOverlay extends React.Component {
-  props: {
-    inspected?: {
-      frame?: Object,
-      style?: any,
-    },
-    inspectedViewTag?: number,
-    onTouchInstance: Function,
-  };
-
-  static propTypes = {
+var InspectorOverlay = React.createClass({
+  propTypes: {
     inspected: PropTypes.shape({
       frame: PropTypes.object,
       style: PropTypes.any,
     }),
     inspectedViewTag: PropTypes.number,
     onTouchInstance: PropTypes.func.isRequired,
-  };
+  },
 
-  findViewForTouchEvent = (e: EventLike) => {
+  findViewForTouchEvent: function(e: EventLike) {
     var {locationX, locationY} = e.nativeEvent.touches[0];
     UIManager.findSubviewIn(
       this.props.inspectedViewTag,
@@ -57,14 +48,14 @@ class InspectorOverlay extends React.Component {
         this.props.onTouchInstance(instance, {left, top, width, height}, locationY);
       }
     );
-  };
+  },
 
-  shouldSetResponser = (e: EventLike): bool => {
+  shouldSetResponser: function(e: EventLike): bool {
     this.findViewForTouchEvent(e);
     return true;
-  };
+  },
 
-  render() {
+  render: function() {
     var content = null;
     if (this.props.inspected) {
       content = <ElementBox frame={this.props.inspected.frame} style={this.props.inspected.style} />;
@@ -79,7 +70,7 @@ class InspectorOverlay extends React.Component {
       </View>
     );
   }
-}
+});
 
 var styles = StyleSheet.create({
   inspector: {

@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule TestBundle
  */
 'use strict';
 
@@ -19,15 +18,12 @@ require('ViewRenderingTestModule');
 require('TestJavaToJSArgumentsModule');
 require('TestJSLocaleModule');
 require('TestJSToJavaParametersModule');
-require('TestJavaToJSReturnValuesModule');
-require('UIManagerTestModule');
 
 require('CatalystRootViewTestModule');
 require('DatePickerDialogTestModule');
 require('MeasureLayoutTestModule');
 require('PickerAndroidTestModule');
 require('ScrollViewTestModule');
-require('ShareTestModule');
 require('SwipeRefreshLayoutTestModule');
 require('TextInputTestModule');
 require('TimePickerDialogTestModule');
@@ -76,10 +72,6 @@ var apps = [
 {
   appKey: 'ScrollViewTestApp',
   component: () => require('ScrollViewTestModule').ScrollViewTestApp,
-},
-{
-  appKey: 'ShareTestApp',
-  component: () => require('ShareTestModule').ShareTestApp,
 },
 {
   appKey: 'SubviewsClippingTestApp',

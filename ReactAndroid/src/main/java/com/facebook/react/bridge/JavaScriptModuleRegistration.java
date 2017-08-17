@@ -10,12 +10,13 @@
 package com.facebook.react.bridge;
 
 import javax.annotation.concurrent.Immutable;
-import javax.annotation.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.facebook.react.common.build.ReactBuildConfig;
@@ -27,10 +28,11 @@ import com.facebook.react.common.build.ReactBuildConfig;
 public class JavaScriptModuleRegistration {
 
   private final Class<? extends JavaScriptModule> mModuleInterface;
-  private @Nullable String mName;
+  private final Map<Method, String> mMethodsToTracingNames;
 
   public JavaScriptModuleRegistration(Class<? extends JavaScriptModule> moduleInterface) {
     mModuleInterface = moduleInterface;
+    mMethodsToTracingNames = new HashMap<>();
 
     if (ReactBuildConfig.DEBUG) {
       Set<String> methodNames = new LinkedHashSet<>();
@@ -44,25 +46,29 @@ public class JavaScriptModuleRegistration {
     }
   }
 
+  public String getTracingName(Method method) {
+    String name = mMethodsToTracingNames.get(method);
+    if (name == null) {
+      name = "JSCall__" + getName() + "_" + method.getName();
+      mMethodsToTracingNames.put(method, name);
+    }
+    return name;
+  }
+
   public Class<? extends JavaScriptModule> getModuleInterface() {
     return mModuleInterface;
   }
-  
+
   public String getName() {
-    if (mName == null) {
-      // With proguard obfuscation turned on, proguard apparently (poorly) emulates inner classes or
-      // something because Class#getSimpleName() no longer strips the outer class name. We manually
-      // strip it here if necessary.
-      String name = mModuleInterface.getSimpleName();
-      int dollarSignIndex = name.lastIndexOf('$');
-      if (dollarSignIndex != -1) {
-        name = name.substring(dollarSignIndex + 1);
-      }
-      
-      // getting the class name every call is expensive, so cache it
-      mName = name;
+    // With proguard obfuscation turned on, proguard apparently (poorly) emulates inner classes or
+    // something because Class#getSimpleName() no longer strips the outer class name. We manually
+    // strip it here if necessary.
+    String name = mModuleInterface.getSimpleName();
+    int dollarSignIndex = name.lastIndexOf('$');
+    if (dollarSignIndex != -1) {
+      name = name.substring(dollarSignIndex + 1);
     }
-    return mName;
+    return name;
   }
 
   public List<Method> getMethods() {

@@ -55,14 +55,12 @@ RCT_EXPORT_MODULE()
                                            selector:@selector(hide)
                                                name:RCTJavaScriptDidLoadNotification
                                              object:nil];
+
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(hide)
                                                name:RCTJavaScriptDidFailToLoadNotification
                                              object:nil];
-
-  if (bridge.loading) {
-    [self showWithURL:bridge.bundleURL];
-  }
+  [self showWithURL:bridge.bundleURL];
 }
 
 RCT_EXPORT_METHOD(showMessage:(NSString *)message color:(UIColor *)color backgroundColor:(UIColor *)backgroundColor)
@@ -72,29 +70,26 @@ RCT_EXPORT_METHOD(showMessage:(NSString *)message color:(UIColor *)color backgro
   }
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    self->_showDate = [NSDate date];
-    if (!self->_window && !RCTRunningInTestEnvironment()) {
+    _showDate = [NSDate date];
+    if (!_window && !RCTRunningInTestEnvironment()) {
       CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
-      self->_window = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, screenWidth, 22)];
-#if TARGET_OS_TV
-      self->_window.windowLevel = UIWindowLevelNormal + 1;
-#else
-      self->_window.windowLevel = UIWindowLevelStatusBar + 1;
-#endif
+      _window = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, screenWidth, 22)];
+      _window.windowLevel = UIWindowLevelStatusBar + 1;
+
       // set a root VC so rotation is supported
-      self->_window.rootViewController = [UIViewController new];
+      _window.rootViewController = [UIViewController new];
 
-      self->_label = [[UILabel alloc] initWithFrame:self->_window.bounds];
-      self->_label.font = [UIFont systemFontOfSize:12.0];
-      self->_label.textAlignment = NSTextAlignmentCenter;
+      _label = [[UILabel alloc] initWithFrame:_window.bounds];
+      _label.font = [UIFont systemFontOfSize:12.0];
+      _label.textAlignment = NSTextAlignmentCenter;
 
-      [self->_window addSubview:self->_label];
+      [_window addSubview:_label];
     }
 
-    self->_label.text = message;
-    self->_label.textColor = color;
-    self->_window.backgroundColor = backgroundColor;
-    self->_window.hidden = NO;
+    _label.text = message;
+    _label.textColor = color;
+    _window.backgroundColor = backgroundColor;
+    _window.hidden = NO;
   });
 }
 
@@ -106,18 +101,18 @@ RCT_EXPORT_METHOD(hide)
 
   dispatch_async(dispatch_get_main_queue(), ^{
     const NSTimeInterval MIN_PRESENTED_TIME = 0.6;
-    NSTimeInterval presentedTime = [[NSDate date] timeIntervalSinceDate:self->_showDate];
+    NSTimeInterval presentedTime = [[NSDate date] timeIntervalSinceDate:_showDate];
     NSTimeInterval delay = MAX(0, MIN_PRESENTED_TIME - presentedTime);
-    CGRect windowFrame = self->_window.frame;
+    CGRect windowFrame = _window.frame;
     [UIView animateWithDuration:0.25
                           delay:delay
                         options:0
                      animations:^{
-                       self->_window.frame = CGRectOffset(windowFrame, 0, -windowFrame.size.height);
+                       _window.frame = CGRectOffset(windowFrame, 0, -windowFrame.size.height);
                      } completion:^(__unused BOOL finished) {
-                       self->_window.frame = windowFrame;
-                       self->_window.hidden = YES;
-                       self->_window = nil;
+                       _window.frame = windowFrame;
+                       _window.hidden = YES;
+                       _window = nil;
                      }];
   });
 }
@@ -142,16 +137,6 @@ RCT_EXPORT_METHOD(hide)
     backgroundColor:backgroundColor];
 }
 
-- (void)updateProgress:(RCTLoadingProgress *)progress
-{
-  if (!progress) {
-    return;
-  }
-  dispatch_async(dispatch_get_main_queue(), ^{
-    self->_label.text = [progress description];
-  });
-}
-
 @end
 
 #else
@@ -160,7 +145,6 @@ RCT_EXPORT_METHOD(hide)
 
 + (NSString *)moduleName { return nil; }
 + (void)setEnabled:(BOOL)enabled { }
-- (void)updateProgress:(RCTLoadingProgress *)progress {}
 
 @end
 

@@ -9,13 +9,12 @@
 
 #import "RCTAssetsLibraryRequestHandler.h"
 
-#import <libkern/OSAtomic.h>
-
 #import <AssetsLibrary/AssetsLibrary.h>
+#import <libkern/OSAtomic.h>
 #import <MobileCoreServices/MobileCoreServices.h>
 
-#import <React/RCTBridge.h>
-#import <React/RCTUtils.h>
+#import "RCTBridge.h"
+#import "RCTUtils.h"
 
 @implementation RCTAssetsLibraryRequestHandler
 {
@@ -55,6 +54,8 @@ RCT_EXPORT_MODULE()
 
       ALAssetRepresentation *representation = [asset defaultRepresentation];
       NSInteger length = (NSInteger)representation.size;
+      
+        
       CFStringRef MIMEType = UTTypeCopyPreferredTagWithClass((__bridge CFStringRef _Nonnull)(representation.UTI), kUTTagClassMIMEType);
 
       NSURLResponse *response =

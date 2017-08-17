@@ -13,7 +13,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 import android.os.Looper;
-import android.os.Process;
 
 import com.facebook.common.logging.FLog;
 import com.facebook.proguard.annotations.DoNotStrip;
@@ -100,18 +99,6 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
   }
 
   /**
-   * Asserts {@link #isOnThread()}, throwing a {@link AssertionException} (NOT an
-   * {@link AssertionError}) if the assertion fails.
-   */
-  @DoNotStrip
-  @Override
-  public void assertIsOnThread(String message) {
-    SoftAssertions.assertCondition(
-      isOnThread(),
-      new StringBuilder().append(mAssertionErrorMessage).append(" ").append(message).toString());
-  }
-
-  /**
    * Quits this queue's Looper. If that Looper was running on a different Thread than the current
    * Thread, also waits for the last message being processed to finish and the Thread to die.
    */
@@ -161,14 +148,12 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
         new MessageQueueThreadImpl(name, mainLooper, exceptionHandler);
 
     if (UiThreadUtil.isOnUiThread()) {
-      Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
       MessageQueueThreadRegistry.register(mqt);
     } else {
       UiThreadUtil.runOnUiThread(
           new Runnable() {
             @Override
             public void run() {
-              Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
               MessageQueueThreadRegistry.register(mqt);
             }
           });

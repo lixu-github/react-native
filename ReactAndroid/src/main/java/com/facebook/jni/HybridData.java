@@ -1,9 +1,15 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+/**
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package com.facebook.jni;
 
 import com.facebook.proguard.annotations.DoNotStrip;
-import com.facebook.soloader.SoLoader;
 
 /**
  * This object holds a native C++ member for hybrid Java/C++ objects.
@@ -18,14 +24,13 @@ import com.facebook.soloader.SoLoader;
  */
 @DoNotStrip
 public class HybridData {
-
-  static {
-    SoLoader.loadLibrary("fb");
-  }
-
   // Private C++ instance
   @DoNotStrip
   private long mNativePointer = 0;
+
+  public HybridData() {
+    Prerequisites.ensure();
+  }
 
   /**
    * To explicitly delete the instance, call resetNative().  If the C++
@@ -41,9 +46,5 @@ public class HybridData {
   protected void finalize() throws Throwable {
     resetNative();
     super.finalize();
-  }
-
-  public boolean isValid() {
-    return mNativePointer != 0;
   }
 }

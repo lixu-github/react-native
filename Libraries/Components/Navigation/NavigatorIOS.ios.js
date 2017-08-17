@@ -13,21 +13,18 @@
 
 var EventEmitter = require('EventEmitter');
 var Image = require('Image');
+var NavigationContext = require('NavigationContext');
 var RCTNavigatorManager = require('NativeModules').NavigatorManager;
 var React = require('React');
 var ReactNative = require('ReactNative');
 var StaticContainer = require('StaticContainer.react');
 var StyleSheet = require('StyleSheet');
-var TVEventHandler = require('TVEventHandler');
 var View = require('View');
-
-const ViewPropTypes = require('ViewPropTypes');
 
 var invariant = require('fbjs/lib/invariant');
 var logError = require('logError');
 var requireNativeComponent = require('requireNativeComponent');
-
-const keyMirror = require('fbjs/lib/keyMirror');
+var resolveAssetSource = require('resolveAssetSource');
 
 var TRANSITIONER_REF = 'transitionerRef';
 
@@ -38,78 +35,47 @@ function getuid() {
   return __uid++;
 }
 
-class NavigatorTransitionerIOS extends React.Component {
-  requestSchedulingNavigation(cb) {
+var NavigatorTransitionerIOS = React.createClass({
+  requestSchedulingNavigation: function(cb) {
     RCTNavigatorManager.requestSchedulingJavaScriptNavigation(
       ReactNative.findNodeHandle(this),
       logError,
       cb
     );
-  }
+  },
 
-  render() {
+  render: function() {
     return (
       <RCTNavigator {...this.props}/>
     );
-  }
-}
-
-const SystemIconLabels = {
-  done: true,
-  cancel: true,
-  edit: true,
-  save: true,
-  add: true,
-  compose: true,
-  reply: true,
-  action: true,
-  organize: true,
-  bookmarks: true,
-  search: true,
-  refresh: true,
-  stop: true,
-  camera: true,
-  trash: true,
-  play: true,
-  pause: true,
-  rewind: true,
-  'fast-forward': true,
-  undo: true,
-  redo: true,
-  'page-curl': true,
-};
-const SystemIcons = keyMirror(SystemIconLabels);
-
-type SystemButtonType = $Enum<typeof SystemIconLabels>;
+  },
+});
 
 type Route = {
-  component: Function,
-  title: string,
-  titleImage?: Object,
-  passProps?: Object,
-  backButtonTitle?: string,
-  backButtonIcon?: Object,
-  leftButtonTitle?: string,
-  leftButtonIcon?: Object,
-  leftButtonSystemIcon?: SystemButtonType,
-  onLeftButtonPress?: Function,
-  rightButtonTitle?: string,
-  rightButtonIcon?: Object,
-  rightButtonSystemIcon?: SystemButtonType,
-  onRightButtonPress?: Function,
-  wrapperStyle?: any,
+  component: Function;
+  title: string;
+  passProps?: Object;
+  backButtonTitle?: string;
+  backButtonIcon?: Object;
+  leftButtonTitle?: string;
+  leftButtonIcon?: Object;
+  onLeftButtonPress?: Function;
+  rightButtonTitle?: string;
+  rightButtonIcon?: Object;
+  onRightButtonPress?: Function;
+  wrapperStyle?: any;
 };
 
 type State = {
-  idStack: Array<number>,
-  routeStack: Array<Route>,
-  requestedTopOfStack: number,
-  observedTopOfStack: number,
-  progress: number,
-  fromIndex: number,
-  toIndex: number,
-  makingNavigatorRequest: boolean,
-  updatingAllIndicesAtOrBeyond: ?number,
+  idStack: Array<number>;
+  routeStack: Array<Route>;
+  requestedTopOfStack: number;
+  observedTopOfStack: number;
+  progress: number;
+  fromIndex: number;
+  toIndex: number;
+  makingNavigatorRequest: boolean;
+  updatingAllIndicesAtOrBeyond: ?number;
 }
 
 type Event = Object;
@@ -134,17 +100,17 @@ type Event = Object;
  * animations and behavior from UIKIt.
  *
  * As the name implies, it is only available on iOS. Take a look at
- * [`React Navigation`](https://reactnavigation.org/) for a cross-platform 
- * solution in JavaScript, or check out either of these components for native
- * solutions: [native-navigation](http://airbnb.io/native-navigation/),
- * [react-native-navigation](https://github.com/wix/react-native-navigation).
+ * [`Navigator`](/docs/navigator.html) for a similar solution for your
+ * cross-platform needs, or check out
+ * [react-native-navigation](https://github.com/wix/react-native-navigation), a
+ * component that aims to provide native navigation on both iOS and Android.
  *
  * To set up the navigator, provide the `initialRoute` prop with a route
  * object. A route object is used to describe each scene that your app
  * navigates to. `initialRoute` represents the first route in your navigator.
  *
  * ```
- * import React, { Component, PropTypes } from 'react';
+ * import React, { Component } from 'react';
  * import { NavigatorIOS, Text } from 'react-native';
  *
  * export default class NavigatorIOSApp extends Component {
@@ -167,7 +133,13 @@ type Event = Object;
  *     navigator: PropTypes.object.isRequired,
  *   }
  *
- *   _onForward = () => {
+ *   constructor(props, context) {
+ *     super(props, context);
+ *     this._onForward = this._onForward.bind(this);
+ *     this._onBack = this._onBack.bind(this);
+ *   }
+ *
+ *   _onForward() {
  *     this.props.navigator.push({
  *       title: 'Scene ' + nextIndex,
  *     });
@@ -365,16 +337,6 @@ var NavigatorIOS = React.createClass({
       leftButtonTitle: PropTypes.string,
 
       /**
-       * If set, the left header button will appear with this system icon
-       *
-       * Supported icons are `done`, `cancel`, `edit`, `save`, `add`,
-       * `compose`, `reply`, `action`, `organize`, `bookmarks`, `search`,
-       * `refresh`, `stop`, `camera`, `trash`, `play`, `pause`, `rewind`,
-       * `fast-forward`, `undo`, `redo`, and `page-curl`
-       */
-      leftButtonSystemIcon: PropTypes.oneOf(Object.keys(SystemIcons)),
-
-      /**
        * This function will be invoked when the left navigation bar item is
        * pressed.
        */
@@ -392,13 +354,6 @@ var NavigatorIOS = React.createClass({
       rightButtonTitle: PropTypes.string,
 
       /**
-       * If set, the right header button will appear with this system icon
-       *
-       * See leftButtonSystemIcon for supported icons
-       */
-      rightButtonSystemIcon: PropTypes.oneOf(Object.keys(SystemIcons)),
-
-      /**
        * This function will be invoked when the right navigation bar item is
        * pressed.
        */
@@ -407,7 +362,7 @@ var NavigatorIOS = React.createClass({
       /**
        * Styles for the navigation item containing the component.
        */
-      wrapperStyle: ViewPropTypes.style,
+      wrapperStyle: View.propTypes.style,
 
       /**
        * Boolean value that indicates whether the navigation bar is hidden.
@@ -459,7 +414,7 @@ var NavigatorIOS = React.createClass({
      * The default wrapper style for components in the navigator.
      * A common use case is to set the `backgroundColor` for every scene.
      */
-    itemWrapperStyle: ViewPropTypes.style,
+    itemWrapperStyle: View.propTypes.style,
 
     /**
      * The default color used for the buttons in the navigation bar.
@@ -498,6 +453,7 @@ var NavigatorIOS = React.createClass({
   },
 
   navigator: (undefined: ?Object),
+  navigationContext: new NavigationContext(),
 
   componentWillMount: function() {
     // Precompute a pack of callbacks that's frequently generated and passed to
@@ -507,21 +463,23 @@ var NavigatorIOS = React.createClass({
       pop: this.pop,
       popN: this.popN,
       replace: this.replace,
-      replaceAtIndex: this.replaceAtIndex,
       replacePrevious: this.replacePrevious,
       replacePreviousAndPop: this.replacePreviousAndPop,
       resetTo: this.resetTo,
       popToRoute: this.popToRoute,
       popToTop: this.popToTop,
+      navigationContext: this.navigationContext,
     };
+    this._emitWillFocus(this.state.routeStack[this.state.observedTopOfStack]);
   },
 
   componentDidMount: function() {
-    this._enableTVEventHandler();
+    this._emitDidFocus(this.state.routeStack[this.state.observedTopOfStack]);
   },
 
   componentWillUnmount: function() {
-    this._disableTVEventHandler();
+    this.navigationContext.dispose();
+    this.navigationContext = new NavigationContext();
   },
 
   getDefaultProps: function(): Object {
@@ -579,8 +537,8 @@ var NavigatorIOS = React.createClass({
   },
 
   getChildContext: function(): {
-    onFocusRequested: Function,
-    focusEmitter: EventEmitter,
+    onFocusRequested: Function;
+    focusEmitter: EventEmitter;
   } {
     return {
       onFocusRequested: this._handleFocusRequest,
@@ -601,6 +559,7 @@ var NavigatorIOS = React.createClass({
 
   _handleNavigatorStackChanged: function(e: Event) {
     var newObservedTopOfStack = e.nativeEvent.stackLength - 1;
+    this._emitDidFocus(this.state.routeStack[newObservedTopOfStack]);
 
     invariant(
       newObservedTopOfStack <= this.state.requestedTopOfStack,
@@ -653,6 +612,14 @@ var NavigatorIOS = React.createClass({
     });
   },
 
+  _emitDidFocus: function(route: Route) {
+    this.navigationContext.emit('didfocus', {route: route});
+  },
+
+  _emitWillFocus: function(route: Route) {
+    this.navigationContext.emit('willfocus', {route: route});
+  },
+
   /**
    * Navigate forward to a new route.
    * @param route The new route to navigate to.
@@ -662,6 +629,7 @@ var NavigatorIOS = React.createClass({
     // Make sure all previous requests are caught up first. Otherwise reject.
     if (this.state.requestedTopOfStack === this.state.observedTopOfStack) {
       this._tryLockNavigator(() => {
+        this._emitWillFocus(route);
 
         var nextStack = this.state.routeStack.concat([route]);
         var nextIDStack = this.state.idStack.concat([getuid()]);
@@ -692,6 +660,7 @@ var NavigatorIOS = React.createClass({
         this._tryLockNavigator(() => {
           var newRequestedTopOfStack = this.state.requestedTopOfStack - n;
           invariant(newRequestedTopOfStack >= 0, 'Cannot pop below 0');
+          this._emitWillFocus(this.state.routeStack[newRequestedTopOfStack]);
           this.setState({
             requestedTopOfStack: newRequestedTopOfStack,
             makingNavigatorRequest: true,
@@ -740,6 +709,8 @@ var NavigatorIOS = React.createClass({
       updatingAllIndicesAtOrBeyond: index,
     });
 
+    this._emitWillFocus(route);
+    this._emitDidFocus(route);
   },
 
   /**
@@ -816,9 +787,6 @@ var NavigatorIOS = React.createClass({
   },
 
   _handleNavigationComplete: function(e: Event) {
-    // Don't propagate to other NavigatorIOS instances this is nested in:
-    e.stopPropagation();
-
     if (this._toFocusOnNavigationComplete) {
       this._getFocusEmitter().emit('focus', this._toFocusOnNavigationComplete);
       this._toFocusOnNavigationComplete = null;
@@ -866,7 +834,6 @@ var NavigatorIOS = React.createClass({
         <NavigatorTransitionerIOS
           ref={TRANSITIONER_REF}
           style={styles.transitioner}
-          // $FlowFixMe(>=0.41.0)
           vertical={this.props.vertical}
           requestedTopOfStack={this.state.requestedTopOfStack}
           onNavigationComplete={this._handleNavigationComplete}
@@ -877,27 +844,8 @@ var NavigatorIOS = React.createClass({
     );
   },
 
-  _tvEventHandler: (undefined: ?TVEventHandler),
-
-  _enableTVEventHandler: function() {
-    this._tvEventHandler = new TVEventHandler();
-    this._tvEventHandler.enable(this, function(cmp, evt) {
-      if (evt && evt.eventType === 'menu') {
-        cmp.pop();
-      }
-    });
-  },
-
-  _disableTVEventHandler: function() {
-    if (this._tvEventHandler) {
-      this._tvEventHandler.disable();
-      delete this._tvEventHandler;
-    }
-  },
-
   render: function() {
     return (
-      // $FlowFixMe(>=0.41.0)
       <View style={this.props.style}>
         {this._renderNavigationStackItems()}
       </View>

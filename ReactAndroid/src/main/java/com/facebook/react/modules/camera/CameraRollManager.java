@@ -17,7 +17,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -49,17 +51,13 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.common.ReactConstants;
-import com.facebook.react.module.annotations.ReactModule;
 
 // TODO #6015104: rename to something less iOSish
 /**
  * {@link NativeModule} that allows JS to interact with the photos on the device (i.e.
  * {@link MediaStore.Images}).
  */
-@ReactModule(name = CameraRollManager.NAME)
 public class CameraRollManager extends ReactContextBaseJavaModule {
-
-  protected static final String NAME = "CameraRollManager";
 
   private static final String ERROR_UNABLE_TO_LOAD = "E_UNABLE_TO_LOAD";
   private static final String ERROR_UNABLE_TO_LOAD_PERMISSION = "E_UNABLE_TO_LOAD_PERMISSION";
@@ -102,7 +100,12 @@ public class CameraRollManager extends ReactContextBaseJavaModule {
 
   @Override
   public String getName() {
-    return NAME;
+    return "RKCameraRollManager";
+  }
+
+  @Override
+  public Map<String, Object> getConstants() {
+    return Collections.emptyMap();
   }
 
   /**
@@ -115,21 +118,25 @@ public class CameraRollManager extends ReactContextBaseJavaModule {
    */
   @ReactMethod
   public void saveToCameraRoll(String uri, String type, Promise promise) {
-    new SaveToCameraRoll(getReactApplicationContext(), Uri.parse(uri), promise)
+    MediaType parsedType = type.equals("video") ? MediaType.VIDEO : MediaType.PHOTO;
+    new SaveToCameraRoll(getReactApplicationContext(), Uri.parse(uri), parsedType, promise)
         .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
   }
 
+  private enum MediaType { PHOTO, VIDEO };
   private static class SaveToCameraRoll extends GuardedAsyncTask<Void, Void> {
 
     private final Context mContext;
     private final Uri mUri;
     private final Promise mPromise;
+    private final MediaType mType;
 
-    public SaveToCameraRoll(ReactContext context, Uri uri, Promise promise) {
+    public SaveToCameraRoll(ReactContext context, Uri uri, MediaType type, Promise promise) {
       super(context);
       mContext = context;
       mUri = uri;
       mPromise = promise;
+      mType = type;
     }
 
     @Override
@@ -137,7 +144,9 @@ public class CameraRollManager extends ReactContextBaseJavaModule {
       File source = new File(mUri.getPath());
       FileChannel input = null, output = null;
       try {
-        File exportDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+        File exportDir = (mType == MediaType.PHOTO)
+          ? Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+          : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
         exportDir.mkdirs();
         if (!exportDir.isDirectory()) {
           mPromise.reject(ERROR_UNABLE_TO_LOAD, "External media storage directory not available");
@@ -431,4 +440,5 @@ public class CameraRollManager extends ReactContextBaseJavaModule {
       node.putMap("location", location);
     }
   }
+
 }

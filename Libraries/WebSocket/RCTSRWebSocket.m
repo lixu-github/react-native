@@ -22,8 +22,9 @@
 #import <Security/SecRandom.h>
 
 #import <CommonCrypto/CommonDigest.h>
-#import <React/RCTAssert.h>
-#import <React/RCTLog.h>
+
+#import "RCTAssert.h"
+#import "RCTLog.h"
 
 typedef NS_ENUM(NSInteger, RCTSROpCode)  {
   RCTSROpCodeTextFrame = 0x1,
@@ -470,9 +471,9 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   }
 
   [self _readUntilHeaderCompleteWithCallback:^(RCTSRWebSocket *socket,  NSData *data) {
-    CFHTTPMessageAppendBytes(self->_receivedHTTPHeaders, (const UInt8 *)data.bytes, data.length);
+    CFHTTPMessageAppendBytes(_receivedHTTPHeaders, (const UInt8 *)data.bytes, data.length);
 
-    if (CFHTTPMessageIsHeaderComplete(self->_receivedHTTPHeaders)) {
+    if (CFHTTPMessageIsHeaderComplete(_receivedHTTPHeaders)) {
       RCTSRLog(@"Finished reading headers %@", CFBridgingRelease(CFHTTPMessageCopyAllHeaderFields(_receivedHTTPHeaders)));
       [socket _HTTPHeadersDidFinish];
     } else {
@@ -490,8 +491,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   CFHTTPMessageSetHeaderFieldValue(request, CFSTR("Host"), (__bridge CFStringRef)(_url.port ? [NSString stringWithFormat:@"%@:%@", _url.host, _url.port] : _url.host));
 
   NSMutableData *keyBytes = [[NSMutableData alloc] initWithLength:16];
-  int result = SecRandomCopyBytes(kSecRandomDefault, keyBytes.length, keyBytes.mutableBytes);
-  assert(result == 0);
+  SecRandomCopyBytes(kSecRandomDefault, keyBytes.length, keyBytes.mutableBytes);
   _secKey = [keyBytes base64EncodedStringWithOptions:0];
   assert([_secKey length] == 24);
 
@@ -643,7 +643,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   // Need to shunt this on the _callbackQueue first to see if they received any messages
   [self _performDelegateBlock:^{
     [self closeWithCode:RCTSRStatusCodeProtocolError reason:message];
-    dispatch_async(self->_workQueue, ^{
+    dispatch_async(_workQueue, ^{
       [self _disconnect];
     });
   }];
@@ -653,7 +653,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 {
   dispatch_async(_workQueue, ^{
     if (self.readyState != RCTSR_CLOSED) {
-      self->_failed = YES;
+      _failed = YES;
       [self _performDelegateBlock:^{
         if ([self.delegate respondsToSelector:@selector(webSocket:didFailWithError:)]) {
           [self.delegate webSocket:self didFailWithError:error];
@@ -661,7 +661,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
       }];
 
       self.readyState = RCTSR_CLOSED;
-      self->_selfRetain = nil;
+      _selfRetain = nil;
 
       RCTSRLog(@"Failing with error %@", error.localizedDescription);
 
@@ -713,7 +713,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 {
   // Need to pingpong this off _callbackQueue first to make sure messages happen in order
   [self _performDelegateBlock:^{
-    dispatch_async(self->_workQueue, ^{
+    dispatch_async(_workQueue, ^{
       [self _sendFrameWithOpcode:RCTSROpCodePong data:pingData];
     });
   }];
@@ -990,7 +990,7 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
       [socket _closeWithProtocolError:@"Client must receive unmasked data"];
     }
 
-    size_t extra_bytes_needed = header.masked ? sizeof(self->_currentReadMaskKey) : 0;
+    size_t extra_bytes_needed = header.masked ? sizeof(_currentReadMaskKey) : 0;
 
     if (header.payload_length == 126) {
       extra_bytes_needed += sizeof(uint16_t);
@@ -1020,7 +1020,7 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
         }
 
         if (header.masked) {
-          assert(mapped_size >= sizeof(self->_currentReadMaskOffset) + offset);
+          assert(mapped_size >= sizeof(_currentReadMaskOffset) + offset);
           memcpy(_socket->_currentReadMaskKey, ((uint8_t *)mapped_buffer) + offset, sizeof(_socket->_currentReadMaskKey));
         }
 
@@ -1033,12 +1033,12 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
 - (void)_readFrameNew;
 {
   dispatch_async(_workQueue, ^{
-    self->_currentFrameData.length = 0;
+    _currentFrameData.length = 0;
 
-    self->_currentFrameOpcode = 0;
-    self->_currentFrameCount = 0;
-    self->_readOpCount = 0;
-    self->_currentStringScanPosition = 0;
+    _currentFrameOpcode = 0;
+    _currentFrameCount = 0;
+    _readOpCount = 0;
+    _currentStringScanPosition = 0;
 
     [self _readFrameContinue];
   });
@@ -1081,7 +1081,7 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
     if (!_failed) {
       [self _performDelegateBlock:^{
         if ([self.delegate respondsToSelector:@selector(webSocket:didCloseWithCode:reason:wasClean:)]) {
-          [self.delegate webSocket:self didCloseWithCode:self->_closeCode reason:self->_closeReason wasClean:YES];
+          [self.delegate webSocket:self didCloseWithCode:_closeCode reason:_closeReason wasClean:YES];
         }
       }];
     }
@@ -1331,8 +1331,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
     }
   } else {
     uint8_t *mask_key = frame_buffer + frame_buffer_size;
-    int result = SecRandomCopyBytes(kSecRandomDefault, sizeof(uint32_t), (uint8_t *)mask_key);
-    assert(result == 0);
+    SecRandomCopyBytes(kSecRandomDefault, sizeof(uint32_t), (uint8_t *)mask_key);
     frame_buffer_size += sizeof(uint32_t);
 
     // TODO: could probably optimize this with SIMD
@@ -1389,9 +1388,9 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
         if (self.readyState >= RCTSR_CLOSING) {
           return;
         }
-        assert(self->_readBuffer);
+        assert(_readBuffer);
 
-        if (self.readyState == RCTSR_CONNECTING && aStream == self->_inputStream) {
+        if (self.readyState == RCTSR_CONNECTING && aStream == _inputStream) {
           [self didConnect];
         }
         [self _pumpWriting];
@@ -1403,8 +1402,8 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
         RCTSRLog(@"NSStreamEventErrorOccurred %@ %@", aStream, [aStream.streamError copy]);
         // TODO: specify error better!
         [self _failWithError:aStream.streamError];
-        self->_readBufferOffset = 0;
-        self->_readBuffer.length = 0;
+        _readBufferOffset = 0;
+        _readBuffer.length = 0;
         break;
 
       }
@@ -1415,14 +1414,14 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
         if (aStream.streamError) {
           [self _failWithError:aStream.streamError];
         } else {
-          dispatch_async(self->_workQueue, ^{
+          dispatch_async(_workQueue, ^{
             if (self.readyState != RCTSR_CLOSED) {
               self.readyState = RCTSR_CLOSED;
-              self->_selfRetain = nil;
+              _selfRetain = nil;
             }
 
-            if (!self->_sentClose && !self->_failed) {
-              self->_sentClose = YES;
+            if (!_sentClose && !_failed) {
+              _sentClose = YES;
               // If we get closed in this state it's probably not clean because we should be sending this when we send messages
               [self _performDelegateBlock:^{
                 if ([self.delegate respondsToSelector:@selector(webSocket:didCloseWithCode:reason:wasClean:)]) {
@@ -1441,13 +1440,13 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
         const int bufferSize = 2048;
         uint8_t buffer[bufferSize];
 
-        while (self->_inputStream.hasBytesAvailable) {
-          NSInteger bytes_read = [self->_inputStream read:buffer maxLength:bufferSize];
+        while (_inputStream.hasBytesAvailable) {
+          NSInteger bytes_read = [_inputStream read:buffer maxLength:bufferSize];
 
           if (bytes_read > 0) {
-            [self->_readBuffer appendBytes:buffer length:bytes_read];
+            [_readBuffer appendBytes:buffer length:bytes_read];
           } else if (bytes_read < 0) {
-            [self _failWithError:self->_inputStream.streamError];
+            [self _failWithError:_inputStream.streamError];
           }
 
           if (bytes_read != bufferSize) {

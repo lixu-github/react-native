@@ -61,12 +61,11 @@ import static org.mockito.Mockito.when;
     Call.class,
     RequestBodyUtil.class,
     ProgressRequestBody.class,
-    ProgressListener.class,
+    ProgressRequestListener.class,
     MultipartBody.class,
     MultipartBody.Builder.class,
     NetworkingModule.class,
     OkHttpClient.class,
-    OkHttpClient.Builder.class,
     OkHttpCallUtil.class})
 @RunWith(RobolectricTestRunner.class)
 @PowerMockIgnore({"org.mockito.*", "org.robolectric.*", "android.*"})
@@ -85,9 +84,6 @@ public class NetworkingModuleTest {
         return callMock;
       }
     });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
 
@@ -95,12 +91,11 @@ public class NetworkingModuleTest {
       mock(ExecutorToken.class),
       "GET",
       "http://somedomain/foo",
-      /* requestId */ 0,
-      /* headers */ JavaOnlyArray.of(),
-      /* body */ null,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      0,
+      JavaOnlyArray.of(),
+      null,
+      true,
+      0);
 
     ArgumentCaptor<Request> argumentCaptor = ArgumentCaptor.forClass(Request.class);
     verify(httpClient).newCall(argumentCaptor.capture());
@@ -117,9 +112,6 @@ public class NetworkingModuleTest {
     when(context.getJSModule(any(ExecutorToken.class), any(Class.class))).thenReturn(emitter);
 
     OkHttpClient httpClient = mock(OkHttpClient.class);
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule = new NetworkingModule(context, "", httpClient);
 
     List<JavaOnlyArray> invalidHeaders = Arrays.asList(JavaOnlyArray.of("foo"));
@@ -130,12 +122,11 @@ public class NetworkingModuleTest {
       mock(ExecutorToken.class),
       "GET",
       "http://somedoman/foo",
-      /* requestId */ 0,
-      /* headers */ JavaOnlyArray.from(invalidHeaders),
-      /* body */ null,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      0,
+      JavaOnlyArray.from(invalidHeaders),
+      null,
+      true,
+      0);
 
     verifyErrorEmit(emitter, 0);
   }
@@ -147,9 +138,6 @@ public class NetworkingModuleTest {
     when(context.getJSModule(any(ExecutorToken.class), any(Class.class))).thenReturn(emitter);
 
     OkHttpClient httpClient = mock(OkHttpClient.class);
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule = new NetworkingModule(context, "", httpClient);
 
     JavaOnlyMap body = new JavaOnlyMap();
@@ -164,9 +152,8 @@ public class NetworkingModuleTest {
       0,
       JavaOnlyArray.of(),
       body,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
 
     verifyErrorEmit(emitter, 0);
   }
@@ -209,9 +196,6 @@ public class NetworkingModuleTest {
             return callMock;
           }
         });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
 
@@ -225,9 +209,8 @@ public class NetworkingModuleTest {
       0,
       JavaOnlyArray.of(JavaOnlyArray.of("Content-Type", "text/plain")),
       body,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
 
     ArgumentCaptor<Request> argumentCaptor = ArgumentCaptor.forClass(Request.class);
     verify(httpClient).newCall(argumentCaptor.capture());
@@ -251,9 +234,6 @@ public class NetworkingModuleTest {
         return callMock;
       }
     });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
 
@@ -268,9 +248,8 @@ public class NetworkingModuleTest {
       0,
       JavaOnlyArray.from(headers),
       null,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
     ArgumentCaptor<Request> argumentCaptor = ArgumentCaptor.forClass(Request.class);
     verify(httpClient).newCall(argumentCaptor.capture());
     Headers requestHeaders = argumentCaptor.getValue().headers();
@@ -286,8 +265,7 @@ public class NetworkingModuleTest {
         .thenReturn(mock(InputStream.class));
     when(RequestBodyUtil.create(any(MediaType.class), any(InputStream.class)))
         .thenReturn(mock(RequestBody.class));
-    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressListener.class)))
-        .thenCallRealMethod();
+    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressRequestListener.class))).thenCallRealMethod();
 
     JavaOnlyMap body = new JavaOnlyMap();
     JavaOnlyArray formData = new JavaOnlyArray();
@@ -310,9 +288,6 @@ public class NetworkingModuleTest {
             return callMock;
           }
         });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
     networkingModule.sendRequest(
@@ -322,9 +297,8 @@ public class NetworkingModuleTest {
       0,
       new JavaOnlyArray(),
       body,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
 
     // verify url, method, headers
     ArgumentCaptor<Request> argumentCaptor = ArgumentCaptor.forClass(Request.class);
@@ -346,8 +320,7 @@ public class NetworkingModuleTest {
         .thenReturn(mock(InputStream.class));
     when(RequestBodyUtil.create(any(MediaType.class), any(InputStream.class)))
         .thenReturn(mock(RequestBody.class));
-    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressListener.class)))
-        .thenCallRealMethod();
+    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressRequestListener.class))).thenCallRealMethod();
 
     List<JavaOnlyArray> headers = Arrays.asList(
             JavaOnlyArray.of("Accept", "text/plain"),
@@ -375,9 +348,6 @@ public class NetworkingModuleTest {
             return callMock;
           }
         });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
     networkingModule.sendRequest(
@@ -387,9 +357,8 @@ public class NetworkingModuleTest {
       0,
       JavaOnlyArray.from(headers),
       body,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
 
     // verify url, method, headers
     ArgumentCaptor<Request> argumentCaptor = ArgumentCaptor.forClass(Request.class);
@@ -414,8 +383,7 @@ public class NetworkingModuleTest {
     when(RequestBodyUtil.getFileInputStream(any(ReactContext.class), any(String.class)))
         .thenReturn(inputStream);
     when(RequestBodyUtil.create(any(MediaType.class), any(InputStream.class))).thenCallRealMethod();
-    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressListener.class)))
-        .thenCallRealMethod();
+    when(RequestBodyUtil.createProgressRequest(any(RequestBody.class), any(ProgressRequestListener.class))).thenCallRealMethod();
     when(inputStream.available()).thenReturn("imageUri".length());
 
     final MultipartBody.Builder multipartBuilder = mock(MultipartBody.Builder.class);
@@ -477,9 +445,6 @@ public class NetworkingModuleTest {
             return callMock;
           }
         });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
 
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
@@ -490,9 +455,8 @@ public class NetworkingModuleTest {
       0,
       JavaOnlyArray.from(headers),
       body,
-      /* responseType */ "text",
-      /* useIncrementalUpdates*/ true,
-      /* timeout */ 0);
+      true,
+      0);
 
     // verify RequestBodyPart for image
     PowerMockito.verifyStatic(times(1));
@@ -539,9 +503,6 @@ public class NetworkingModuleTest {
         return calls[(Integer) request.tag() - 1];
       }
     });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
     networkingModule.initialize();
@@ -554,8 +515,7 @@ public class NetworkingModuleTest {
         idx + 1,
         JavaOnlyArray.of(),
         null,
-        /* responseType */ "text",
-        /* useIncrementalUpdates*/ true,
+        true,
         0);
     }
     verify(httpClient, times(3)).newCall(any(Request.class));
@@ -590,9 +550,6 @@ public class NetworkingModuleTest {
         return calls[(Integer) request.tag() - 1];
       }
     });
-    OkHttpClient.Builder clientBuilder = mock(OkHttpClient.Builder.class);
-    when(clientBuilder.build()).thenReturn(httpClient);
-    when(httpClient.newBuilder()).thenReturn(clientBuilder);
     NetworkingModule networkingModule =
       new NetworkingModule(mock(ReactApplicationContext.class), "", httpClient);
 
@@ -604,8 +561,7 @@ public class NetworkingModuleTest {
         idx + 1,
         JavaOnlyArray.of(),
         null,
-        /* responseType */ "text",
-        /* useIncrementalUpdates*/ true,
+        true,
         0);
     }
     verify(httpClient, times(3)).newCall(any(Request.class));

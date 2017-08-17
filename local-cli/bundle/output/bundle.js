@@ -5,55 +5,37 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @flow
  */
-
 'use strict';
 
-const Server = require('../../../packager/src/Server');
-
+const Promise = require('promise');
 const meta = require('./meta');
-const relativizeSourceMap = require('../../../packager/src//lib/relativizeSourceMap');
 const writeFile = require('./writeFile');
 
-import type Bundle from '../../../packager/src//Bundler/Bundle';
-import type {OutputOptions, RequestOptions} from '../types.flow';
-
-function buildBundle(packagerClient: Server, requestOptions: RequestOptions) {
+function buildBundle(packagerClient, requestOptions) {
   return packagerClient.buildBundle({
-    ...Server.DEFAULT_BUNDLE_OPTIONS,
     ...requestOptions,
     isolateModuleIDs: true,
   });
 }
 
-function createCodeWithMap(bundle: Bundle, dev: boolean, sourceMapSourcesRoot?: string): * {
-  const map = bundle.getSourceMap({dev});
-  const sourceMap = relativizeSourceMap(
-    typeof map === 'string' ? JSON.parse(map) : map,
-    sourceMapSourcesRoot);
+function createCodeWithMap(bundle, dev) {
   return {
     code: bundle.getSource({dev}),
-    map: JSON.stringify(sourceMap),
+    map: JSON.stringify(bundle.getSourceMap({dev})),
   };
 }
 
-function saveBundleAndMap(
-  bundle: Bundle,
-  options: OutputOptions,
-  log: (x: string) => {},
-): Promise<> {
+function saveBundleAndMap(bundle, options, log) {
   const {
-    bundleOutput,
-    bundleEncoding: encoding,
+    'bundle-output': bundleOutput,
+    'bundle-encoding': encoding,
     dev,
-    sourcemapOutput,
-    sourcemapSourcesRoot
+    'sourcemap-output': sourcemapOutput,
   } = options;
 
   log('start');
-  const codeWithMap = createCodeWithMap(bundle, !!dev, sourcemapSourcesRoot);
+  const codeWithMap = createCodeWithMap(bundle, dev);
   log('finish');
 
   log('Writing bundle output to:', bundleOutput);

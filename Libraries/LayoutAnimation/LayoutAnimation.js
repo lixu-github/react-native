@@ -11,12 +11,11 @@
  */
 'use strict';
 
+var PropTypes = require('ReactPropTypes');
 var UIManager = require('UIManager');
 
+var createStrictShapeTypeChecker = require('createStrictShapeTypeChecker');
 var keyMirror = require('fbjs/lib/keyMirror');
-
-// $FlowFixMe checkPropTypes not yet landed to Flow
-var {checkPropTypes, PropTypes} = require('react');
 
 var TypesEnum = {
   spring: true,
@@ -34,7 +33,7 @@ var PropertiesEnum = {
 };
 var Properties = keyMirror(PropertiesEnum);
 
-var animType = PropTypes.shape({
+var animChecker = createStrictShapeTypeChecker({
   duration: PropTypes.number,
   delay: PropTypes.number,
   springDamping: PropTypes.number,
@@ -48,36 +47,30 @@ var animType = PropTypes.shape({
 });
 
 type Anim = {
-  duration?: number,
-  delay?: number,
-  springDamping?: number,
-  initialVelocity?: number,
-  type?: $Enum<typeof TypesEnum>,
-  property?: $Enum<typeof PropertiesEnum>,
+  duration?: number;
+  delay?: number;
+  springDamping?: number;
+  initialVelocity?: number;
+  type?: $Enum<typeof TypesEnum>;
+  property?: $Enum<typeof PropertiesEnum>;
 }
 
-var configType = PropTypes.shape({
+var configChecker = createStrictShapeTypeChecker({
   duration: PropTypes.number.isRequired,
-  create: animType,
-  update: animType,
-  delete: animType,
+  create: animChecker,
+  update: animChecker,
+  delete: animChecker,
 });
 
 type Config = {
-  duration: number,
-  create?: Anim,
-  update?: Anim,
-  delete?: Anim,
-}
-
-function checkConfig(config: Config, location: string, name: string) {
-  checkPropTypes({config: configType}, {config}, location, name);
+  duration: number;
+  create?: Anim;
+  update?: Anim;
+  delete?: Anim;
 }
 
 function configureNext(config: Config, onAnimationDidEnd?: Function) {
-  if (__DEV__) {
-    checkConfig(config, 'config', 'LayoutAnimation.configureNext');
-  }
+  configChecker({config}, 'config', 'LayoutAnimation.configureNext');
   UIManager.configureNextLayoutAnimation(
     config, onAnimationDidEnd || function() {}, function() { /* unused */ }
   );
@@ -128,11 +121,8 @@ var Presets = {
  * Automatically animates views to their new positions when the
  * next layout happens.
  *
- * A common way to use this API is to call it before calling `setState`.
- *
- * Note that in order to get this to work on **Android** you need to set the following flags via `UIManager`:
- *
- *     UIManager.setLayoutAnimationEnabledExperimental && UIManager.setLayoutAnimationEnabledExperimental(true);
+ * A common way to use this API is to call `LayoutAnimation.configureNext`
+ * before calling `setState`.
  */
 var LayoutAnimation = {
   /**
@@ -156,7 +146,7 @@ var LayoutAnimation = {
   create,
   Types,
   Properties,
-  checkConfig,
+  configChecker: configChecker,
   Presets,
   easeInEaseOut: configureNext.bind(
     null, Presets.easeInEaseOut

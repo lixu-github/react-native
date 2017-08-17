@@ -24,7 +24,6 @@ import android.view.LayoutInflater;
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.bridge.queue.MessageQueueThread;
 import com.facebook.react.bridge.queue.ReactQueueConfiguration;
-import com.facebook.react.common.LifecycleState;
 
 /**
  * Abstract ContextWrapper for Android application or activity {@link Context} and
@@ -34,15 +33,12 @@ public class ReactContext extends ContextWrapper {
 
   private static final String EARLY_JS_ACCESS_EXCEPTION_MESSAGE =
     "Tried to access a JS module before the React instance was fully set up. Calls to " +
-      "ReactContext#getJSModule should only happen once initialize() has been called on your " +
-      "native module.";
+      "ReactContext#getJSModule should be protected by ReactContext#hasActiveCatalystInstance().";
 
   private final CopyOnWriteArraySet<LifecycleEventListener> mLifecycleEventListeners =
       new CopyOnWriteArraySet<>();
   private final CopyOnWriteArraySet<ActivityEventListener> mActivityEventListeners =
       new CopyOnWriteArraySet<>();
-
-  private LifecycleState mLifecycleState = LifecycleState.BEFORE_CREATE;
 
   private @Nullable CatalystInstance mCatalystInstance;
   private @Nullable LayoutInflater mInflater;
@@ -105,9 +101,7 @@ public class ReactContext extends ContextWrapper {
     return mCatalystInstance.getJSModule(jsInterface);
   }
 
-  public <T extends JavaScriptModule> T getJSModule(
-    ExecutorToken executorToken,
-    Class<T> jsInterface) {
+  public <T extends JavaScriptModule> T getJSModule(ExecutorToken executorToken, Class<T> jsInterface) {
     if (mCatalystInstance == null) {
       throw new RuntimeException(EARLY_JS_ACCESS_EXCEPTION_MESSAGE);
     }
@@ -141,33 +135,8 @@ public class ReactContext extends ContextWrapper {
     return mCatalystInstance != null && !mCatalystInstance.isDestroyed();
   }
 
-  public LifecycleState getLifecycleState() {
-    return mLifecycleState;
-  }
-
-  public void addLifecycleEventListener(final LifecycleEventListener listener) {
+  public void addLifecycleEventListener(LifecycleEventListener listener) {
     mLifecycleEventListeners.add(listener);
-    if (hasActiveCatalystInstance()) {
-      switch (mLifecycleState) {
-        case BEFORE_CREATE:
-        case BEFORE_RESUME:
-          break;
-        case RESUMED:
-          runOnUiQueueThread(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                listener.onHostResume();
-              } catch (RuntimeException e) {
-                handleException(e);
-              }
-            }
-          });
-          break;
-        default:
-          throw new RuntimeException("Unhandled lifecycle state.");
-      }
-    }
   }
 
   public void removeLifecycleEventListener(LifecycleEventListener listener) {
@@ -187,28 +156,9 @@ public class ReactContext extends ContextWrapper {
    */
   public void onHostResume(@Nullable Activity activity) {
     UiThreadUtil.assertOnUiThread();
-    mLifecycleState = LifecycleState.RESUMED;
     mCurrentActivity = new WeakReference(activity);
-    ReactMarker.logMarker(ReactMarkerConstants.ON_HOST_RESUME_START);
     for (LifecycleEventListener listener : mLifecycleEventListeners) {
-      try {
-        listener.onHostResume();
-      } catch (RuntimeException e) {
-        handleException(e);
-      }
-    }
-    ReactMarker.logMarker(ReactMarkerConstants.ON_HOST_RESUME_END);
-  }
-
-  public void onNewIntent(@Nullable Activity activity, Intent intent) {
-    UiThreadUtil.assertOnUiThread();
-    mCurrentActivity = new WeakReference(activity);
-    for (ActivityEventListener listener : mActivityEventListeners) {
-      try {
-        listener.onNewIntent(intent);
-      } catch (RuntimeException e) {
-        handleException(e);
-      }
+      listener.onHostResume();
     }
   }
 
@@ -217,16 +167,10 @@ public class ReactContext extends ContextWrapper {
    */
   public void onHostPause() {
     UiThreadUtil.assertOnUiThread();
-    mLifecycleState = LifecycleState.BEFORE_RESUME;
-    ReactMarker.logMarker(ReactMarkerConstants.ON_HOST_PAUSE_START);
     for (LifecycleEventListener listener : mLifecycleEventListeners) {
-      try {
-        listener.onHostPause();
-      } catch (RuntimeException e) {
-        handleException(e);
-      }
+      listener.onHostPause();
     }
-    ReactMarker.logMarker(ReactMarkerConstants.ON_HOST_PAUSE_END);
+    mCurrentActivity = null;
   }
 
   /**
@@ -234,15 +178,9 @@ public class ReactContext extends ContextWrapper {
    */
   public void onHostDestroy() {
     UiThreadUtil.assertOnUiThread();
-    mLifecycleState = LifecycleState.BEFORE_CREATE;
     for (LifecycleEventListener listener : mLifecycleEventListeners) {
-      try {
-        listener.onHostDestroy();
-      } catch (RuntimeException e) {
-        handleException(e);
-      }
+      listener.onHostDestroy();
     }
-    mCurrentActivity = null;
   }
 
   /**
@@ -259,13 +197,9 @@ public class ReactContext extends ContextWrapper {
   /**
    * Should be called by the hosting Fragment in {@link Fragment#onActivityResult}
    */
-  public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+  public void onActivityResult(int requestCode, int resultCode, Intent data) {
     for (ActivityEventListener listener : mActivityEventListeners) {
-      try {
-        listener.onActivityResult(activity, requestCode, resultCode, data);
-      } catch (RuntimeException e) {
-        handleException(e);
-      }
+      listener.onActivityResult(requestCode, resultCode, data);
     }
   }
 
@@ -283,10 +217,6 @@ public class ReactContext extends ContextWrapper {
 
   public void assertOnNativeModulesQueueThread() {
     Assertions.assertNotNull(mNativeModulesMessageQueueThread).assertIsOnThread();
-  }
-
-  public void assertOnNativeModulesQueueThread(String message) {
-    Assertions.assertNotNull(mNativeModulesMessageQueueThread).assertIsOnThread(message);
   }
 
   public boolean isOnNativeModulesQueueThread() {
@@ -345,17 +275,10 @@ public class ReactContext extends ContextWrapper {
    * DO NOT HOLD LONG-LIVED REFERENCES TO THE OBJECT RETURNED BY THIS METHOD, AS THIS WILL CAUSE
    * MEMORY LEAKS.
    */
-  public @Nullable Activity getCurrentActivity() {
+  /* package */ @Nullable Activity getCurrentActivity() {
     if (mCurrentActivity == null) {
       return null;
     }
     return mCurrentActivity.get();
-  }
-
-  /**
-   * Get the C pointer (as a long) to the JavaScriptCore context associated with this instance.
-   */
-  public long getJavaScriptContext() {
-    return mCatalystInstance.getJavaScriptContext();
   }
 }

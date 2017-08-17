@@ -9,12 +9,8 @@
 
 #import "RCTWebSocketModule.h"
 
-#import <objc/runtime.h>
-
-#import <React/RCTConvert.h>
-#import <React/RCTUtils.h>
-
-#import "RCTSRWebSocket.h"
+#import "RCTConvert.h"
+#import "RCTUtils.h"
 
 @implementation RCTSRWebSocket (React)
 
@@ -27,10 +23,6 @@
 {
   objc_setAssociatedObject(self, @selector(reactTag), reactTag, OBJC_ASSOCIATION_COPY_NONATOMIC);
 }
-
-@end
-
-@interface RCTWebSocketModule () <RCTSRWebSocketDelegate>
 
 @end
 
@@ -83,11 +75,6 @@ RCT_EXPORT_METHOD(sendBinary:(NSString *)base64String socketID:(nonnull NSNumber
 {
   NSData *message = [[NSData alloc] initWithBase64EncodedString:base64String options:0];
   [_sockets[socketID] send:message];
-}
-
-RCT_EXPORT_METHOD(ping:(nonnull NSNumber *)socketID)
-{
-  [_sockets[socketID] sendPing:NULL];
 }
 
 RCT_EXPORT_METHOD(close:(nonnull NSNumber *)socketID)

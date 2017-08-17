@@ -35,8 +35,6 @@
  */
 @property (nonatomic, assign) BOOL recordMode;
 
-@property (nonatomic, copy) NSString *testSuffix;
-
 @property (nonatomic, readonly) NSURL *scriptURL;
 
 /**

@@ -15,27 +15,18 @@ var ColorPropType = require('ColorPropType');
 var React = require('React');
 var StyleSheet = require('StyleSheet');
 var TabBarItemIOS = require('TabBarItemIOS');
-const ViewPropTypes = require('ViewPropTypes');
+var View = require('View');
 
 var requireNativeComponent = require('requireNativeComponent');
 
-class TabBarIOS extends React.Component {
-  props: {
-    style?: $FlowFixMe,
-    unselectedTintColor?: $FlowFixMe,
-    tintColor?: $FlowFixMe,
-    unselectedItemTintColor?: $FlowFixMe,
-    barTintColor?: $FlowFixMe,
-    translucent?: boolean,
-    itemPositioning?: 'fill' | 'center' | 'auto',
-  };
+var TabBarIOS = React.createClass({
+  statics: {
+    Item: TabBarItemIOS,
+  },
 
-  static Item = TabBarItemIOS;
-
-  // $FlowFixMe(>=0.41.0)
-  static propTypes = {
-    ...ViewPropTypes,
-    style: ViewPropTypes.style,
+  propTypes: {
+    ...View.propTypes,
+    style: View.propTypes.style,
     /**
      * Color of text on unselected tabs
      */
@@ -44,10 +35,6 @@ class TabBarIOS extends React.Component {
      * Color of the currently selected tab icon
      */
     tintColor: ColorPropType,
-    /**
-     * Color of unselected tab icons. Available since iOS 10.
-     */
-    unselectedItemTintColor: ColorPropType,
     /**
      * Background color of the tab bar
      */
@@ -66,25 +53,22 @@ class TabBarIOS extends React.Component {
      * it defaults to center.
      */
     itemPositioning: React.PropTypes.oneOf(['fill', 'center', 'auto']),
-  };
+  },
 
-  render() {
+  render: function() {
     return (
       <RCTTabBar
         style={[styles.tabGroup, this.props.style]}
         unselectedTintColor={this.props.unselectedTintColor}
-        unselectedItemTintColor={this.props.unselectedItemTintColor}
         tintColor={this.props.tintColor}
         barTintColor={this.props.barTintColor}
         itemPositioning={this.props.itemPositioning}
         translucent={this.props.translucent !== false}>
-        {
-          // $FlowFixMe found when converting React.createClass to ES6
-          this.props.children}
+        {this.props.children}
       </RCTTabBar>
     );
   }
-}
+});
 
 var styles = StyleSheet.create({
   tabGroup: {

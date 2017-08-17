@@ -34,9 +34,10 @@ var TextUpdateTest = React.createClass({
   },
   componentDidMount: function() {
     this.requestAnimationFrame(
-      () => this.setState({seeMore: false}, () => {
-        TestManager.markTestCompleted();
-      })
+      () => this.setState(
+        {seeMore: false},
+        TestManager.markTestCompleted
+      )
     );
   },
   render: function() {

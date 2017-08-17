@@ -38,22 +38,25 @@ std::vector<std::string> ModuleRegistry::moduleNames() {
   return names;
 }
 
-folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name) {
+folly::dynamic ModuleRegistry::getConfig(const std::string& name) {
   SystraceSection s("getConfig", "module", name);
   auto it = modulesByName_.find(name);
   if (it == modulesByName_.end()) {
     return nullptr;
   }
-
   CHECK(it->second < modules_.size());
+
   NativeModule* module = modules_[it->second].get();
 
-  // string name, object constants, array methodNames (methodId is index), [array promiseMethodIds], [array syncMethodIds]
+  // string name, [object constants,] array methodNames (methodId is index), [array asyncMethodIds]
   folly::dynamic config = folly::dynamic::array(name);
 
   {
     SystraceSection s("getConstants");
-    config.push_back(module->getConstants());
+    folly::dynamic constants = module->getConstants();
+    if (constants.isObject() && constants.size() > 0) {
+      config.push_back(std::move(constants));
+    }
   }
 
   {
@@ -61,26 +64,19 @@ folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name)
     std::vector<MethodDescriptor> methods = module->getMethods();
 
     folly::dynamic methodNames = folly::dynamic::array;
-    folly::dynamic promiseMethodIds = folly::dynamic::array;
-    folly::dynamic syncMethodIds = folly::dynamic::array;
+    folly::dynamic asyncMethodIds = folly::dynamic::array;
 
     for (auto& descriptor : methods) {
-      // TODO: #10487027 compare tags instead of doing string comparison?
       methodNames.push_back(std::move(descriptor.name));
-      if (descriptor.type == "promise") {
-        promiseMethodIds.push_back(methodNames.size() - 1);
-      } else if (descriptor.type == "sync") {
-        syncMethodIds.push_back(methodNames.size() - 1);
+      if (descriptor.type == "remoteAsync") {
+        asyncMethodIds.push_back(methodNames.size() - 1);
       }
     }
 
     if (!methodNames.empty()) {
       config.push_back(std::move(methodNames));
-      if (!promiseMethodIds.empty() || !syncMethodIds.empty()) {
-        config.push_back(std::move(promiseMethodIds));
-        if (!syncMethodIds.empty()) {
-          config.push_back(std::move(syncMethodIds));
-        }
+      if (!asyncMethodIds.empty()) {
+        config.push_back(std::move(asyncMethodIds));
       }
     }
   }
@@ -89,7 +85,7 @@ folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name)
     // no constants or methods
     return nullptr;
   } else {
-    return ModuleConfig({it->second, config});
+    return config;
   }
 }
 

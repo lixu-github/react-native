@@ -5,27 +5,20 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @flow
  */
 'use strict';
 
-const MAGIC_UNBUNDLE_NUMBER = require('./magic-number');
-
-const buildSourceMapWithMetaData = require('./build-unbundle-sourcemap-with-metadata');
 const mkdirp = require('mkdirp');
 const path = require('path');
-const relativizeSourceMap = require('../../../../packager/src//lib/relativizeSourceMap');
+const Promise = require('promise');
+
+const buildSourceMapWithMetaData = require('./build-unbundle-sourcemap-with-metadata');
 const writeFile = require('../writeFile');
 const writeSourceMap = require('./write-sourcemap');
-
+const MAGIC_UNBUNDLE_NUMBER = require('./magic-number');
 const {joinModules} = require('./util');
 
-import type Bundle from '../../../../packager/src//Bundler/Bundle';
-import type {OutputOptions} from '../../types.flow';
-
-// must not start with a dot, as that won't go into the apk
-const MAGIC_UNBUNDLE_FILENAME = 'UNBUNDLE';
+const MAGIC_UNBUNDLE_FILENAME = 'UNBUNDLE'; // must not start with a dot, as that won't go into the apk
 const MODULES_DIR = 'js-modules';
 
 /**
@@ -35,16 +28,11 @@ const MODULES_DIR = 'js-modules';
  * All other modules go into a 'js-modules' folder that in the same parent
  * directory as the startup file.
  */
-function saveAsAssets(
-  bundle: Bundle,
-  options: OutputOptions,
-  log: (x: string) => void,
-): Promise<mixed> {
+function saveAsAssets(bundle, options, log) {
   const {
-    bundleOutput,
-    bundleEncoding: encoding,
-    sourcemapOutput,
-    sourcemapSourcesRoot,
+    'bundle-output': bundleOutput,
+    'bundle-encoding': encoding,
+    'sourcemap-output': sourcemapOutput,
   } = options;
 
   log('start');
@@ -65,18 +53,11 @@ function saveAsAssets(
   writeUnbundle.then(() => log('Done writing unbundle output'));
 
   const sourceMap =
-    relativizeSourceMap(
-      buildSourceMapWithMetaData({
-        startupModules: startupModules.concat(),
-        lazyModules: lazyModules.concat(),
-      }),
-      sourcemapSourcesRoot
-    );
-
+    buildSourceMapWithMetaData({startupModules, lazyModules});
 
   return Promise.all([
     writeUnbundle,
-    sourcemapOutput && writeSourceMap(sourcemapOutput, JSON.stringify(sourceMap), log)
+    writeSourceMap(sourcemapOutput, JSON.stringify(sourceMap), log)
   ]);
 }
 
@@ -98,8 +79,8 @@ function writeModules(modules, modulesDir, encoding) {
 
 function writeMagicFlagFile(outputDir) {
   /* global Buffer: true */
-  const buffer = new Buffer(4);
-  buffer.writeUInt32LE(MAGIC_UNBUNDLE_NUMBER, 0);
+  const buffer = Buffer(4);
+  buffer.writeUInt32LE(MAGIC_UNBUNDLE_NUMBER);
   return writeFile(path.join(outputDir, MAGIC_UNBUNDLE_FILENAME), buffer);
 }
 

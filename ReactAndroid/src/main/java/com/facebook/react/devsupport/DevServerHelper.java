@@ -9,37 +9,23 @@
 
 package com.facebook.react.devsupport;
 
-import javax.annotation.Nullable;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import android.content.Context;
-import android.os.AsyncTask;
 import android.os.Handler;
+import android.text.TextUtils;
 
 import com.facebook.common.logging.FLog;
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.common.ReactConstants;
 import com.facebook.react.common.network.OkHttpCallUtil;
-import com.facebook.react.devsupport.interfaces.PackagerStatusCallback;
 import com.facebook.react.modules.systeminfo.AndroidInfoHelpers;
-import com.facebook.react.packagerconnection.FileIoHandler;
-import com.facebook.react.packagerconnection.JSPackagerClient;
-import com.facebook.react.packagerconnection.RequestHandler;
-import com.facebook.react.packagerconnection.NotificationOnlyHandler;
-import com.facebook.react.packagerconnection.RequestOnlyHandler;
-import com.facebook.react.packagerconnection.Responder;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import java.io.File;
+import java.io.IOException;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Nullable;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -48,8 +34,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okio.Buffer;
-import okio.BufferedSource;
 import okio.Okio;
 import okio.Sink;
 
@@ -63,12 +47,12 @@ import okio.Sink;
  *  - Genymotion emulator with default settings: 10.0.3.2
  */
 public class DevServerHelper {
+
   public static final String RELOAD_APP_EXTRA_JS_PROXY = "jsproxy";
   private static final String RELOAD_APP_ACTION_SUFFIX = ".RELOAD_APP_ACTION";
 
   private static final String BUNDLE_URL_FORMAT =
       "http://%s/%s.bundle?platform=android&dev=%s&hot=%s&minify=%s";
-  private static final String RESOURCE_URL_FORMAT = "http://%s/%s";
   private static final String SOURCE_MAP_URL_FORMAT =
       BUNDLE_URL_FORMAT.replaceFirst("\\.bundle", ".map");
   private static final String LAUNCH_JS_DEVTOOLS_COMMAND_URL_FORMAT =
@@ -77,8 +61,6 @@ public class DevServerHelper {
       "http://%s/onchange";
   private static final String WEBSOCKET_PROXY_URL_FORMAT = "ws://%s/debugger-proxy?role=client";
   private static final String PACKAGER_STATUS_URL_FORMAT = "http://%s/status";
-  private static final String HEAP_CAPTURE_UPLOAD_URL_FORMAT = "http://%s/jscheapcaptureupload";
-  private static final String INSPECTOR_DEVICE_URL_FORMAT = "http://%s/inspector/device?name=%s";
 
   private static final String PACKAGER_OK_STATUS = "packager-status:running";
 
@@ -88,7 +70,6 @@ public class DevServerHelper {
 
   public interface BundleDownloadCallback {
     void onSuccess();
-    void onProgress(@Nullable String status, @Nullable Integer done, @Nullable Integer total);
     void onFailure(Exception cause);
   }
 
@@ -96,10 +77,8 @@ public class DevServerHelper {
     void onServerContentChanged();
   }
 
-  public interface PackagerCommandListener {
-    void onPackagerReloadCommand();
-    void onCaptureHeapCommand(@Nullable final Responder responder);
-    void onPokeSamplingProfilerCommand(@Nullable final Responder responder);
+  public interface PackagerStatusCallback {
+    void onPackagerStatusFetched(boolean packagerIsRunning);
   }
 
   private final DevInternalSettings mSettings;
@@ -107,8 +86,6 @@ public class DevServerHelper {
   private final Handler mRestartOnChangePollingHandler;
 
   private boolean mOnChangePollingEnabled;
-  private @Nullable JSPackagerClient mPackagerClient;
-  private @Nullable InspectorPackagerConnection mInspectorPackagerConnection;
   private @Nullable OkHttpClient mOnChangePollingClient;
   private @Nullable OnServerContentChangeListener mOnServerContentChangeListener;
   private @Nullable Call mDownloadBundleFromURLCall;
@@ -124,110 +101,13 @@ public class DevServerHelper {
     mRestartOnChangePollingHandler = new Handler();
   }
 
-  public void openPackagerConnection(final PackagerCommandListener commandListener) {
-    if (mPackagerClient != null) {
-      FLog.w(ReactConstants.TAG, "Packager connection already open, nooping.");
-      return;
-    }
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... backgroundParams) {
-        Map<String, RequestHandler> handlers =
-          new HashMap<String, RequestHandler>();
-        handlers.put("reload", new NotificationOnlyHandler() {
-          @Override
-          public void onNotification(@Nullable Object params) {
-            commandListener.onPackagerReloadCommand();
-          }
-        });
-        handlers.put("captureHeap", new RequestOnlyHandler() {
-          @Override
-          public void onRequest(@Nullable Object params, Responder responder) {
-            commandListener.onCaptureHeapCommand(responder);
-          }
-        });
-        handlers.put("pokeSamplingProfiler", new RequestOnlyHandler() {
-          @Override
-          public void onRequest(@Nullable Object params, Responder responder) {
-            commandListener.onPokeSamplingProfilerCommand(responder);
-          }
-        });
-        handlers.putAll(new FileIoHandler().handlers());
-
-        mPackagerClient = new JSPackagerClient("devserverhelper", mSettings.getPackagerConnectionSettings(), handlers);
-        mPackagerClient.init();
-
-        return null;
-      }
-    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-  }
-
-  public void closePackagerConnection() {
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... params) {
-        if (mPackagerClient != null) {
-          mPackagerClient.close();
-          mPackagerClient = null;
-        }
-        return null;
-      }
-    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-  }
-
-  public void openInspectorConnection() {
-    if (mInspectorPackagerConnection != null) {
-      FLog.w(ReactConstants.TAG, "Inspector connection already open, nooping.");
-      return;
-    }
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... params) {
-        mInspectorPackagerConnection = new InspectorPackagerConnection(getInspectorDeviceUrl());
-        mInspectorPackagerConnection.connect();
-        return null;
-      }
-    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-  }
-
-  public void openInspector(String id) {
-    if (mInspectorPackagerConnection != null) {
-      mInspectorPackagerConnection.sendOpenEvent(id);
-    }
-  }
-
-  public void closeInspectorConnection() {
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... params) {
-        if (mInspectorPackagerConnection != null) {
-          mInspectorPackagerConnection.closeQuietly();
-          mInspectorPackagerConnection = null;
-        }
-        return null;
-      }
-    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-  }
-
-    /** Intent action for reloading the JS */
+  /** Intent action for reloading the JS */
   public static String getReloadAppAction(Context context) {
     return context.getPackageName() + RELOAD_APP_ACTION_SUFFIX;
   }
 
   public String getWebsocketProxyURL() {
-    return String.format(Locale.US, WEBSOCKET_PROXY_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost());
-  }
-
-  public String getHeapCaptureUploadUrl() {
-    return String.format(Locale.US, HEAP_CAPTURE_UPLOAD_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost());
-  }
-
-  public String getInspectorDeviceUrl() {
-    return String.format(
-        Locale.US,
-        INSPECTOR_DEVICE_URL_FORMAT,
-        mSettings.getPackagerConnectionSettings().getDebugServerHost(),
-        AndroidInfoHelpers.getFriendlyDeviceName());
+    return String.format(Locale.US, WEBSOCKET_PROXY_URL_FORMAT, getDebugServerHost());
   }
 
   /**
@@ -258,30 +138,41 @@ public class DevServerHelper {
     return mSettings.isHotModuleReplacementEnabled();
   }
 
+  /**
+   * @return the host to use when connecting to the bundle server.
+   */
+  private String getDebugServerHost() {
+    // Check debug server host setting first. If empty try to detect emulator type and use default
+    // hostname for those
+    String hostFromSettings = mSettings.getDebugServerHost();
+
+    if (!TextUtils.isEmpty(hostFromSettings)) {
+      return Assertions.assertNotNull(hostFromSettings);
+    }
+
+    String host = AndroidInfoHelpers.getServerHost();
+
+    if (host.equals(AndroidInfoHelpers.DEVICE_LOCALHOST)) {
+      FLog.w(
+        ReactConstants.TAG,
+        "You seem to be running on device. Run 'adb reverse tcp:8081 tcp:8081' " +
+          "to forward the debug server's port to the device.");
+    }
+
+    return host;
+  }
+
   private static String createBundleURL(String host, String jsModulePath, boolean devMode, boolean hmr, boolean jsMinify) {
     return String.format(Locale.US, BUNDLE_URL_FORMAT, host, jsModulePath, devMode, hmr, jsMinify);
   }
 
-  private static String createResourceURL(String host, String resourcePath) {
-    return String.format(Locale.US, RESOURCE_URL_FORMAT, host, resourcePath);
-  }
-
-  public String getDevServerBundleURL(final String jsModulePath) {
-    return createBundleURL(
-      mSettings.getPackagerConnectionSettings().getDebugServerHost(),
-      jsModulePath,
-      getDevMode(),
-      getHMR(),
-      getJSMinifyMode());
-  }
-
   public void downloadBundleFromURL(
       final BundleDownloadCallback callback,
-      final File outputFile,
-      final String bundleURL) {
+      final String jsModulePath,
+      final File outputFile) {
+    final String bundleURL = createBundleURL(getDebugServerHost(), jsModulePath, getDevMode(), getHMR(), getJSMinifyMode());
     final Request request = new Request.Builder()
         .url(bundleURL)
-        .addHeader("Accept", "multipart/mixed")
         .build();
     mDownloadBundleFromURLCall = Assertions.assertNotNull(mClient.newCall(request));
     mDownloadBundleFromURLCall.enqueue(new Callback() {
@@ -294,14 +185,19 @@ public class DevServerHelper {
         }
         mDownloadBundleFromURLCall = null;
 
-        callback.onFailure(DebugServerException.makeGeneric(
-            "Could not connect to development server.",
-            "URL: " + call.request().url().toString(),
-            e));
+        StringBuilder sb = new StringBuilder();
+        sb.append("Could not connect to development server.\n\n")
+          .append("Try the following to fix the issue:\n")
+          .append("\u2022 Ensure that the packager server is running\n")
+          .append("\u2022 Ensure that your device/emulator is connected to your machine and has USB debugging enabled - run 'adb devices' to see a list of connected devices\n")
+          .append("\u2022 If you're on a physical device connected to the same machine, run 'adb reverse tcp:8081 tcp:8081' to forward requests from your device\n")
+          .append("\u2022 If your device is on the same Wi-Fi network, set 'Debug server host & port for device' in 'Dev settings' to your machine's IP address and the port of the local dev server - e.g. 10.0.1.1:8081\n\n")
+          .append("URL: ").append(call.request().url().toString());
+        callback.onFailure(new DebugServerException(sb.toString()));
       }
 
       @Override
-      public void onResponse(Call call, final Response response) throws IOException {
+      public void onResponse(Call call, Response response) throws IOException {
         // ignore callback if call was cancelled
         if (mDownloadBundleFromURLCall == null || mDownloadBundleFromURLCall.isCanceled()) {
           mDownloadBundleFromURLCall = null;
@@ -309,99 +205,35 @@ public class DevServerHelper {
         }
         mDownloadBundleFromURLCall = null;
 
-        final String url = response.request().url().toString();
-
-        // Make sure the result is a multipart response and parse the boundary.
-        String contentType = response.header("content-type");
-        Pattern regex = Pattern.compile("multipart/mixed;.*boundary=\"([^\"]+)\"");
-        Matcher match = regex.matcher(contentType);
-        if (match.find()) {
-          String boundary = match.group(1);
-          MultipartStreamReader bodyReader = new MultipartStreamReader(response.body().source(), boundary);
-          boolean completed = bodyReader.readAllParts(new MultipartStreamReader.ChunkCallback() {
-            @Override
-            public void execute(Map<String, String> headers, Buffer body, boolean finished) throws IOException {
-              // This will get executed for every chunk of the multipart response. The last chunk
-              // (finished = true) will be the JS bundle, the other ones will be progress events
-              // encoded as JSON.
-              if (finished) {
-                // The http status code for each separate chunk is in the X-Http-Status header.
-                int status = response.code();
-                if (headers.containsKey("X-Http-Status")) {
-                  status = Integer.parseInt(headers.get("X-Http-Status"));
-                }
-                processBundleResult(url, status, body, outputFile, callback);
-              } else {
-                if (!headers.containsKey("Content-Type") || !headers.get("Content-Type").equals("application/json")) {
-                  return;
-                }
-                try {
-                  JSONObject progress = new JSONObject(body.readUtf8());
-                  String status = null;
-                  if (progress.has("status")) {
-                    status = progress.getString("status");
-                  }
-                  Integer done = null;
-                  if (progress.has("done")) {
-                    done = progress.getInt("done");
-                  }
-                  Integer total = null;
-                  if (progress.has("total")) {
-                    total = progress.getInt("total");
-                  }
-                  callback.onProgress(status, done, total);
-                } catch (JSONException e) {
-                  FLog.e(ReactConstants.TAG, "Error parsing progress JSON. " + e.toString());
-                }
-              }
-            }
-          });
-          if (!completed) {
-            callback.onFailure(new DebugServerException(
-                "Error while reading multipart response.\n\nResponse code: " + response.code() + "\n\n" +
-                "URL: " + call.request().url().toString() + "\n\n"));
+        // Check for server errors. If the server error has the expected form, fail with more info.
+        if (!response.isSuccessful()) {
+          String body = response.body().string();
+          DebugServerException debugServerException = DebugServerException.parse(body);
+          if (debugServerException != null) {
+            callback.onFailure(debugServerException);
+          } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append("The development server returned response error code: ").append(response.code()).append("\n\n")
+              .append("URL: ").append(call.request().url().toString()).append("\n\n")
+              .append("Body:\n")
+              .append(body);
+            callback.onFailure(new DebugServerException(sb.toString()));
           }
-        } else {
-          // In case the server doesn't support multipart/mixed responses, fallback to normal download.
-          processBundleResult(url, response.code(), Okio.buffer(response.body().source()), outputFile, callback);
+          return;
+        }
+
+        Sink output = null;
+        try {
+          output = Okio.sink(outputFile);
+          Okio.buffer(response.body().source()).readAll(output);
+          callback.onSuccess();
+        } finally {
+          if (output != null) {
+            output.close();
+          }
         }
       }
     });
-  }
-
-  private void processBundleResult(
-      String url,
-      int statusCode,
-      BufferedSource body,
-      File outputFile,
-      BundleDownloadCallback callback) throws IOException {
-    // Check for server errors. If the server error has the expected form, fail with more info.
-    if (statusCode != 200) {
-      String bodyString = body.readUtf8();
-      DebugServerException debugServerException = DebugServerException.parse(bodyString);
-      if (debugServerException != null) {
-        callback.onFailure(debugServerException);
-      } else {
-        StringBuilder sb = new StringBuilder();
-        sb.append("The development server returned response error code: ").append(statusCode).append("\n\n")
-          .append("URL: ").append(url).append("\n\n")
-          .append("Body:\n")
-          .append(bodyString);
-        callback.onFailure(new DebugServerException(sb.toString()));
-      }
-      return;
-    }
-
-    Sink output = null;
-    try {
-      output = Okio.sink(outputFile);
-      body.readAll(output);
-      callback.onSuccess();
-    } finally {
-      if (output != null) {
-        output.close();
-      }
-    }
   }
 
   public void cancelDownloadBundleFromURL() {
@@ -412,7 +244,7 @@ public class DevServerHelper {
   }
 
   public void isPackagerRunning(final PackagerStatusCallback callback) {
-    String statusURL = createPackagerStatusURL(mSettings.getPackagerConnectionSettings().getDebugServerHost());
+    String statusURL = createPackagerStatusURL(getDebugServerHost());
     Request request = new Request.Builder()
         .url(statusURL)
         .build();
@@ -532,11 +364,11 @@ public class DevServerHelper {
   }
 
   private String createOnChangeEndpointUrl() {
-    return String.format(Locale.US, ONCHANGE_ENDPOINT_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost());
+    return String.format(Locale.US, ONCHANGE_ENDPOINT_URL_FORMAT, getDebugServerHost());
   }
 
   private String createLaunchJSDevtoolsCommandUrl() {
-    return String.format(Locale.US, LAUNCH_JS_DEVTOOLS_COMMAND_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost());
+    return String.format(LAUNCH_JS_DEVTOOLS_COMMAND_URL_FORMAT, getDebugServerHost());
   }
 
   public void launchJSDevtools() {
@@ -558,11 +390,11 @@ public class DevServerHelper {
   }
 
   public String getSourceMapUrl(String mainModuleName) {
-    return String.format(Locale.US, SOURCE_MAP_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost(), mainModuleName, getDevMode(), getHMR(), getJSMinifyMode());
+    return String.format(Locale.US, SOURCE_MAP_URL_FORMAT, getDebugServerHost(), mainModuleName, getDevMode(), getHMR(), getJSMinifyMode());
   }
 
   public String getSourceUrl(String mainModuleName) {
-    return String.format(Locale.US, BUNDLE_URL_FORMAT, mSettings.getPackagerConnectionSettings().getDebugServerHost(), mainModuleName, getDevMode(), getHMR(), getJSMinifyMode());
+    return String.format(Locale.US, BUNDLE_URL_FORMAT, getDebugServerHost(), mainModuleName, getDevMode(), getHMR(), getJSMinifyMode());
   }
 
   public String getJSBundleURLForRemoteDebugging(String mainModuleName) {
@@ -570,47 +402,5 @@ public class DevServerHelper {
     // same as the one needed to connect to the same server from the JavaScript proxy running on the
     // host itself.
     return createBundleURL(getHostForJSProxy(), mainModuleName, getDevMode(), getHMR(), getJSMinifyMode());
-  }
-
-  /**
-   * This is a debug-only utility to allow fetching a file via packager.
-   * It's made synchronous for simplicity, but should only be used if it's absolutely
-   * necessary.
-   * @return the file with the fetched content, or null if there's any failure.
-   */
-  public @Nullable File downloadBundleResourceFromUrlSync(
-      final String resourcePath,
-      final File outputFile) {
-    final String resourceURL = createResourceURL(mSettings.getPackagerConnectionSettings().getDebugServerHost(), resourcePath);
-    final Request request = new Request.Builder()
-        .url(resourceURL)
-        .build();
-
-    try {
-      Response response = mClient.newCall(request).execute();
-      if (!response.isSuccessful()) {
-        return null;
-      }
-      Sink output = null;
-
-      try {
-        output = Okio.sink(outputFile);
-        Okio.buffer(response.body().source()).readAll(output);
-      } finally {
-        if (output != null) {
-          output.close();
-        }
-      }
-
-      return outputFile;
-    } catch (Exception ex) {
-      FLog.e(
-          ReactConstants.TAG,
-          "Failed to fetch resource synchronously - resourcePath: \"%s\", outputFile: \"%s\"",
-          resourcePath,
-          outputFile.getAbsolutePath(),
-          ex);
-      return null;
-    }
   }
 }

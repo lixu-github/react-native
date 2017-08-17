@@ -4,24 +4,23 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <unordered_map>
 
-#include <cxxreact/Executor.h>
-#include <cxxreact/ExecutorToken.h>
-#include <cxxreact/JSCNativeModules.h>
-#include <folly/Optional.h>
+#include <JavaScriptCore/JSContextRef.h>
+
 #include <folly/json.h>
-#include <jschelpers/JSCHelpers.h>
-#include <jschelpers/JavaScriptCore.h>
-#include <jschelpers/Value.h>
+
+#include "Executor.h"
+#include "ExecutorToken.h"
+#include "JSCHelpers.h"
+#include "Value.h"
 
 namespace facebook {
 namespace react {
 
 class MessageQueueThread;
 
-class RN_EXPORT JSCExecutorFactory : public JSExecutorFactory {
+class JSCExecutorFactory : public JSExecutorFactory {
 public:
   JSCExecutorFactory(const std::string& cacheDir, const folly::dynamic& jscConfig) :
   m_cacheDir(cacheDir),
@@ -45,10 +44,7 @@ public:
   Object jsObj;
 };
 
-template <typename T>
-struct ValueEncoder;
-
-class RN_EXPORT JSCExecutor : public JSExecutor {
+class JSCExecutor : public JSExecutor {
 public:
   /**
    * Must be invoked from thread this Executor will run on.
@@ -61,45 +57,27 @@ public:
 
   virtual void loadApplicationScript(
     std::unique_ptr<const JSBigString> script,
-    std::string sourceURL) override;
-
+    std::string sourceURL) throw(JSException) override;
   virtual void setJSModulesUnbundle(
     std::unique_ptr<JSModulesUnbundle> unbundle) override;
-
   virtual void callFunction(
     const std::string& moduleId,
     const std::string& methodId,
-    const folly::dynamic& arguments) override;
-
+    const folly::dynamic& arguments) throw(JSException) override;
   virtual void invokeCallback(
     const double callbackId,
-    const folly::dynamic& arguments) override;
-
-  template <typename T>
-  Value callFunctionSync(
-      const std::string& module, const std::string& method, T&& args) {
-    return callFunctionSyncWithValue(
-      module, method, ValueEncoder<typename std::decay<T>::type>::toValue(
-        m_context, std::forward<T>(args)));
-  }
-
+    const folly::dynamic& arguments) throw(JSException) override;
   virtual void setGlobalVariable(
     std::string propName,
-    std::unique_ptr<const JSBigString> jsonValue) override;
-
+    std::unique_ptr<const JSBigString> jsonValue) throw(JSException) override;
   virtual void* getJavaScriptContext() override;
-
   virtual bool supportsProfiling() override;
   virtual void startProfiler(const std::string &titleString) override;
   virtual void stopProfiler(const std::string &titleString, const std::string &filename) override;
-
   virtual void handleMemoryPressureUiHidden() override;
   virtual void handleMemoryPressureModerate() override;
   virtual void handleMemoryPressureCritical() override;
-
   virtual void destroy() override;
-
-  void setContextName(const std::string& name);
 
 private:
   JSGlobalContextRef m_context;
@@ -111,14 +89,7 @@ private:
   std::string m_deviceCacheDir;
   std::shared_ptr<MessageQueueThread> m_messageQueueThread;
   std::unique_ptr<JSModulesUnbundle> m_unbundle;
-  JSCNativeModules m_nativeModules;
   folly::dynamic m_jscConfig;
-  std::once_flag m_bindFlag;
-
-  folly::Optional<Object> m_invokeCallbackAndReturnFlushedQueueJS;
-  folly::Optional<Object> m_callFunctionReturnFlushedQueueJS;
-  folly::Optional<Object> m_flushedQueueJS;
-  folly::Optional<Object> m_callFunctionReturnResultAndFlushedQueueJS;
 
   /**
    * WebWorker constructor. Must be invoked from thread this Executor will run on.
@@ -133,14 +104,9 @@ private:
       const folly::dynamic& jscConfig);
 
   void initOnJSVMThread() throw(JSException);
-  // This method is experimental, and may be modified or removed.
-  Value callFunctionSyncWithValue(
-    const std::string& module, const std::string& method, Value value);
   void terminateOnJSVMThread();
-  void bindBridge() throw(JSException);
-  void callNativeModules(Value&&);
-  void flush();
-  void flushQueueImmediate(Value&&);
+  void flush() throw(JSException);
+  void flushQueueImmediate(std::string queueJSON);
   void loadModule(uint32_t moduleId);
 
   int addWebWorker(std::string scriptURL, JSValueRef workerRef, JSValueRef globalObjRef);
@@ -151,10 +117,12 @@ private:
   void terminateOwnedWebWorker(int worker);
   Object createMessageObject(const std::string& msgData);
 
-  template<JSValueRef (JSCExecutor::*method)(size_t, const JSValueRef[])>
+  template< JSValueRef (JSCExecutor::*method)(size_t, const JSValueRef[])>
   void installNativeHook(const char* name);
-  JSValueRef getNativeModule(JSObjectRef object, JSStringRef propertyName);
 
+  JSValueRef nativeRequireModuleConfig(
+      size_t argumentCount,
+      const JSValueRef arguments[]);
   JSValueRef nativeStartWorker(
       size_t argumentCount,
       const JSValueRef arguments[]);

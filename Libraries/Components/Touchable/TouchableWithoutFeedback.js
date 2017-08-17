@@ -1,3 +1,4 @@
+
 /**
  * Copyright (c) 2015-present, Facebook, Inc.
  * All rights reserved.
@@ -15,14 +16,11 @@ const EdgeInsetsPropType = require('EdgeInsetsPropType');
 const React = require('React');
 const TimerMixin = require('react-timer-mixin');
 const Touchable = require('Touchable');
+const View = require('View');
 
 const ensurePositiveDelayProps = require('ensurePositiveDelayProps');
+const onlyChild = require('onlyChild');
 const warning = require('fbjs/lib/warning');
-
-const {
-  AccessibilityComponentTypes,
-  AccessibilityTraits,
-} = require('ViewAccessibility');
 
 type Event = Object;
 
@@ -30,23 +28,22 @@ const PRESS_RETENTION_OFFSET = {top: 20, left: 20, right: 20, bottom: 30};
 
 /**
  * Do not use unless you have a very good reason. All the elements that
- * respond to press should have a visual feedback when touched.
+ * respond to press should have a visual feedback when touched. This is
+ * one of the primary reason a "web" app doesn't feel "native".
  *
- * TouchableWithoutFeedback supports only one child.
- * If you wish to have several child components, wrap them in a View.
+ * > **NOTE**: TouchableWithoutFeedback supports only one child
+ * >
+ * > If you wish to have several child components, wrap them in a View.
  */
-// $FlowFixMe(>=0.41.0)
 const TouchableWithoutFeedback = React.createClass({
   mixins: [TimerMixin, Touchable.Mixin],
 
   propTypes: {
     accessible: React.PropTypes.bool,
-    accessibilityComponentType: React.PropTypes.oneOf(
-      AccessibilityComponentTypes
-    ),
+    accessibilityComponentType: React.PropTypes.oneOf(View.AccessibilityComponentType),
     accessibilityTraits: React.PropTypes.oneOfType([
-      React.PropTypes.oneOf(AccessibilityTraits),
-      React.PropTypes.arrayOf(React.PropTypes.oneOf(AccessibilityTraits)),
+      React.PropTypes.oneOf(View.AccessibilityTraits),
+      React.PropTypes.arrayOf(React.PropTypes.oneOf(View.AccessibilityTraits)),
     ]),
     /**
      * If true, disable all interactions for this component.
@@ -152,10 +149,9 @@ const TouchableWithoutFeedback = React.createClass({
     return this.props.delayPressOut || 0;
   },
 
-  render: function(): React.Element<any> {
+  render: function(): ReactElement<any> {
     // Note(avik): remove dynamic typecast once Flow has been upgraded
-    // $FlowFixMe(>=0.41.0)
-    const child = React.Children.only(this.props.children);
+    const child = onlyChild(this.props.children);
     let children = child.props.children;
     warning(
       !child.type || child.type.displayName !== 'Text',
@@ -163,7 +159,9 @@ const TouchableWithoutFeedback = React.createClass({
         ((child._owner && child._owner.getName && child._owner.getName()) || '<unknown>')
     );
     if (Touchable.TOUCH_TARGET_DEBUG && child.type && child.type.displayName === 'View') {
-      children = React.Children.toArray(children);
+      if (!Array.isArray(children)) {
+        children = [children];
+      }
       children.push(Touchable.renderDebugView({color: 'red', hitSlop: this.props.hitSlop}));
     }
     const style = (Touchable.TOUCH_TARGET_DEBUG && child.type && child.type.displayName === 'Text') ?
@@ -171,11 +169,9 @@ const TouchableWithoutFeedback = React.createClass({
       child.props.style;
     return (React: any).cloneElement(child, {
       accessible: this.props.accessible !== false,
-      // $FlowFixMe(>=0.41.0)
       accessibilityLabel: this.props.accessibilityLabel,
       accessibilityComponentType: this.props.accessibilityComponentType,
       accessibilityTraits: this.props.accessibilityTraits,
-      // $FlowFixMe(>=0.41.0)
       testID: this.props.testID,
       onLayout: this.props.onLayout,
       hitSlop: this.props.hitSlop,

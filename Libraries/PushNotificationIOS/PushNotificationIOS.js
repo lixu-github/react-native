@@ -19,43 +19,13 @@ const PushNotificationEmitter = new NativeEventEmitter(RCTPushNotificationManage
 
 const _notifHandlers = new Map();
 
+//TODO: remove this once all call sites for popInitialNotification() have been removed
+let _initialNotification = RCTPushNotificationManager &&
+  RCTPushNotificationManager.initialNotification;
+
 const DEVICE_NOTIF_EVENT = 'remoteNotificationReceived';
 const NOTIF_REGISTER_EVENT = 'remoteNotificationsRegistered';
-const NOTIF_REGISTRATION_ERROR_EVENT = 'remoteNotificationRegistrationError';
 const DEVICE_LOCAL_NOTIF_EVENT = 'localNotificationReceived';
-
-export type FetchResult = {
-  NewData: string,
-  NoData: string,
-  ResultFailed: string,
-};
-
-/**
- * An event emitted by PushNotificationIOS.
- */
-export type PushNotificationEventName = $Enum<{
-  /**
-   * Fired when a remote notification is received. The handler will be invoked
-   * with an instance of `PushNotificationIOS`.
-   */
-  notification: string,
-  /**
-   * Fired when a local notification is received. The handler will be invoked
-   * with an instance of `PushNotificationIOS`.
-   */
-  localNotification: string,
-  /**
-   * Fired when the user registers for remote notifications. The handler will be
-   * invoked with a hex string representing the deviceToken.
-   */
-  register: string,
-  /**
-   * Fired when the user fails to register for remote notifications. Typically
-   * occurs when APNS is having issues, or the device is a simulator. The
-   * handler will be invoked with {message: string, code: number, details: any}.
-   */
-  registrationError: string,
-}>;
 
 /**
  * Handle push notifications for your app, including permission handling and
@@ -90,21 +60,19 @@ export type PushNotificationEventName = $Enum<{
  *    {
  *     [RCTPushNotificationManager didRegisterForRemoteNotificationsWithDeviceToken:deviceToken];
  *    }
- *    // Required for the notification event. You must call the completion handler after handling the remote notification.
- *    - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
- *                                                           fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler
+ *    // Required for the notification event.
+ *    - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)notification
  *    {
- *      [RCTPushNotificationManager didReceiveRemoteNotification:userInfo fetchCompletionHandler:completionHandler];
- *    }
- *    // Required for the registrationError event.
- *    - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error
- *    {
- *     [RCTPushNotificationManager didFailToRegisterForRemoteNotificationsWithError:error];
+ *     [RCTPushNotificationManager didReceiveRemoteNotification:notification];
  *    }
  *    // Required for the localNotification event.
  *    - (void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification
  *    {
  *     [RCTPushNotificationManager didReceiveLocalNotification:notification];
+ *    }
+ *    - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error
+ *    {
+ *      NSLog(@"%@", error);
  *    }
  *   ```
  */
@@ -113,15 +81,6 @@ class PushNotificationIOS {
   _alert: string | Object;
   _sound: string;
   _badgeCount: number;
-  _notificationId: string;
-  _isRemote: boolean;
-  _remoteNotificationCompleteCalllbackCalled: boolean;
-
-  static FetchResult: FetchResult = {
-    NewData: 'UIBackgroundFetchResultNewData',
-    NoData: 'UIBackgroundFetchResultNoData',
-    ResultFailed: 'UIBackgroundFetchResultFailed',
-  };
 
   /**
    * Schedules the localNotification for immediate presentation.
@@ -133,7 +92,7 @@ class PushNotificationIOS {
    * - `soundName` : The sound played when the notification is fired (optional).
    * - `category`  : The category of this notification, required for actionable notifications (optional).
    * - `userInfo`  : An optional object containing additional notification data.
-   * - `applicationIconBadgeNumber` (optional) : The number to display as the app's icon badge. The default value of this property is 0, which means that no badge is displayed.
+   * - `applicationIconBadgeNumber` (optional) : The number to display as the app’s icon badge. The default value of this property is 0, which means that no badge is displayed.
    */
   static presentLocalNotification(details: Object) {
     RCTPushNotificationManager.presentLocalNotification(details);
@@ -150,8 +109,7 @@ class PushNotificationIOS {
    * - `soundName` : The sound played when the notification is fired (optional).
    * - `category`  : The category of this notification, required for actionable notifications (optional).
    * - `userInfo` : An optional object containing additional notification data.
-   * - `applicationIconBadgeNumber` (optional) : The number to display as the app's icon badge. Setting the number to 0 removes the icon badge.
-   * - `repeatInterval` : The interval to repeat as a string.  Possible values: `minute`, `hour`, `day`, `week`, `month`, `year`.
+   * - `applicationIconBadgeNumber` (optional) : The number to display as the app’s icon badge. Setting the number to 0 removes the icon badge.
    */
   static scheduleLocalNotification(details: Object) {
     RCTPushNotificationManager.scheduleLocalNotification(details);
@@ -162,40 +120,6 @@ class PushNotificationIOS {
    */
   static cancelAllLocalNotifications() {
     RCTPushNotificationManager.cancelAllLocalNotifications();
-  }
-
-  /**
-   * Remove all delivered notifications from Notification Center
-   */
-  static removeAllDeliveredNotifications(): void {
-    RCTPushNotificationManager.removeAllDeliveredNotifications();
-  }
-
-  /**
-   * Provides you with a list of the app’s notifications that are still displayed in Notification Center
-   *
-   * @param callback Function which receive an array of delivered notifications
-   *
-   *  A delivered notification is an object containing:
-   *
-   * - `identifier`  : The identifier of this notification.
-   * - `title`  : The title of this notification.
-   * - `body`  : The body of this notification.
-   * - `category`  : The category of this notification, if has one.
-   * - `userInfo`  : An optional object containing additional notification data.
-   * - `thread-id`  : The thread identifier of this notification, if has one.
-   */
-  static getDeliveredNotifications(callback: (notifications: [Object]) => void): void {
-    RCTPushNotificationManager.getDeliveredNotifications(callback);
-  }
-
-  /**
-   * Removes the specified notifications from Notification Center
-   *
-   * @param identifiers Array of notification identifiers
-   */
-  static removeDeliveredNotifications(identifiers: [string]): void {
-    RCTPushNotificationManager.removeDeliveredNotifications(identifiers);
   }
 
   /**
@@ -242,21 +166,18 @@ class PushNotificationIOS {
    *   handler will be invoked with an instance of `PushNotificationIOS`.
    * - `register`: Fired when the user registers for remote notifications. The
    *   handler will be invoked with a hex string representing the deviceToken.
-   * - `registrationError`: Fired when the user fails to register for remote
-   *   notifications. Typically occurs when APNS is having issues, or the device
-   *   is a simulator. The handler will be invoked with
-   *   {message: string, code: number, details: any}.
    */
-  static addEventListener(type: PushNotificationEventName, handler: Function) {
+  static addEventListener(type: string, handler: Function) {
     invariant(
-      type === 'notification' || type === 'register' || type === 'registrationError' || type === 'localNotification',
-      'PushNotificationIOS only supports `notification`, `register`, `registrationError`, and `localNotification` events'
+      type === 'notification' || type === 'register' || type === 'localNotification',
+      'PushNotificationIOS only supports `notification`, `register` and `localNotification` events'
     );
     var listener;
     if (type === 'notification') {
       listener =  PushNotificationEmitter.addListener(
         DEVICE_NOTIF_EVENT,
         (notifData) => {
+          notifData.remote = true;
           handler(new PushNotificationIOS(notifData));
         }
       );
@@ -264,6 +185,7 @@ class PushNotificationIOS {
       listener = PushNotificationEmitter.addListener(
         DEVICE_LOCAL_NOTIF_EVENT,
         (notifData) => {
+          notifData.remote = false;
           handler(new PushNotificationIOS(notifData));
         }
       );
@@ -274,32 +196,25 @@ class PushNotificationIOS {
           handler(registrationInfo.deviceToken);
         }
       );
-    } else if (type === 'registrationError') {
-      listener = PushNotificationEmitter.addListener(
-        NOTIF_REGISTRATION_ERROR_EVENT,
-        (errorInfo) => {
-          handler(errorInfo);
-        }
-      );
     }
-    _notifHandlers.set(type, listener);
+    _notifHandlers.set(handler, listener);
   }
 
   /**
    * Removes the event listener. Do this in `componentWillUnmount` to prevent
    * memory leaks
    */
-  static removeEventListener(type: PushNotificationEventName, handler: Function) {
+  static removeEventListener(type: string, handler: Function) {
     invariant(
-      type === 'notification' || type === 'register' || type === 'registrationError' || type === 'localNotification',
-      'PushNotificationIOS only supports `notification`, `register`, `registrationError`, and `localNotification` events'
+      type === 'notification' || type === 'register' || type === 'localNotification',
+      'PushNotificationIOS only supports `notification`, `register` and `localNotification` events'
     );
-    var listener = _notifHandlers.get(type);
+    var listener = _notifHandlers.get(handler);
     if (!listener) {
       return;
     }
     listener.remove();
-    _notifHandlers.delete(type);
+    _notifHandlers.delete(handler);
   }
 
   /**
@@ -375,8 +290,23 @@ class PushNotificationIOS {
   }
 
   /**
-   * This method returns a promise that resolves to either the notification
-   * object if the app was launched by a push notification, or `null` otherwise.
+   * DEPRECATED: An initial notification will be available if the app was
+   * cold-launched from a notification.
+   *
+   * The first caller of `popInitialNotification` will get the initial
+   * notification object, or `null`. Subsequent invocations will return null.
+   */
+  static popInitialNotification() {
+    console.warn('PushNotificationIOS.popInitialNotification() is deprecated. Use getInitialNotification() instead.');
+    var initialNotification = _initialNotification &&
+      new PushNotificationIOS(_initialNotification);
+    _initialNotification = null;
+    return initialNotification;
+  }
+
+  /**
+   * If the app launch was triggered by a push notification,
+   * it will give the notification object, otherwise it will give `null`
    */
   static getInitialNotification(): Promise<?PushNotificationIOS> {
     return RCTPushNotificationManager.getInitialNotification().then(notification => {
@@ -387,15 +317,10 @@ class PushNotificationIOS {
   /**
    * You will never need to instantiate `PushNotificationIOS` yourself.
    * Listening to the `notification` event and invoking
-   * `getInitialNotification` is sufficient
+   * `popInitialNotification` is sufficient
    */
   constructor(nativeNotif: Object) {
     this._data = {};
-    this._remoteNotificationCompleteCalllbackCalled = false;
-    this._isRemote = nativeNotif.remote;
-    if (this._isRemote) {
-      this._notificationId = nativeNotif.notificationId;
-    }
 
     if (nativeNotif.remote) {
       // Extract data from Apple's `aps` dict as defined:
@@ -417,28 +342,6 @@ class PushNotificationIOS {
       this._alert = nativeNotif.alertBody;
       this._data = nativeNotif.userInfo;
     }
-  }
-
-  /**
-   * This method is available for remote notifications that have been received via:
-   * `application:didReceiveRemoteNotification:fetchCompletionHandler:`
-   * https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIApplicationDelegate_Protocol/#//apple_ref/occ/intfm/UIApplicationDelegate/application:didReceiveRemoteNotification:fetchCompletionHandler:
-   *
-   * Call this to execute when the remote notification handling is complete. When
-   * calling this block, pass in the fetch result value that best describes
-   * the results of your operation. You *must* call this handler and should do so
-   * as soon as possible. For a list of possible values, see `PushNotificationIOS.FetchResult`.
-   *
-   * If you do not call this method your background remote notifications could
-   * be throttled, to read more about it see the above documentation link.
-   */
-  finish(fetchResult: FetchResult) {
-    if (!this._isRemote || !this._notificationId || this._remoteNotificationCompleteCalllbackCalled) {
-      return;
-    }
-    this._remoteNotificationCompleteCalllbackCalled = true;
-
-    RCTPushNotificationManager.onFinishRemoteNotification(this._notificationId, fetchResult);
   }
 
   /**

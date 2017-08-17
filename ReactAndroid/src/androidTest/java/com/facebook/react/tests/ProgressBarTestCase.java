@@ -24,16 +24,12 @@ import com.facebook.react.ReactRootView;
 import com.facebook.react.bridge.CatalystInstance;
 import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.UiThreadUtil;
-import com.facebook.react.modules.appstate.AppStateModule;
-import com.facebook.react.modules.deviceinfo.DeviceInfoModule;
 import com.facebook.react.modules.systeminfo.AndroidInfoModule;
 import com.facebook.react.uimanager.UIImplementation;
-import com.facebook.react.uimanager.UIImplementationProvider;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.ViewManager;
 import com.facebook.react.views.progressbar.ReactProgressBarViewManager;
 import com.facebook.react.views.view.ReactViewManager;
-import com.facebook.react.testing.FakeWebSocketModule;
 import com.facebook.react.testing.ReactIntegrationTestCase;
 import com.facebook.react.testing.ReactTestHelper;
 
@@ -74,8 +70,7 @@ public class ProgressBarTestCase extends ReactIntegrationTestCase {
     mUIManager = new UIManagerModule(
         getContext(),
         viewManagers,
-        new UIImplementationProvider(),
-        false);
+        new UIImplementation(getContext(), viewManagers));
     UiThreadUtil.runOnUiThread(
         new Runnable() {
           @Override
@@ -88,9 +83,6 @@ public class ProgressBarTestCase extends ReactIntegrationTestCase {
     mInstance = ReactTestHelper.catalystInstanceBuilder(this)
         .addNativeModule(mUIManager)
         .addNativeModule(new AndroidInfoModule())
-        .addNativeModule(new DeviceInfoModule(getContext()))
-        .addNativeModule(new AppStateModule(getContext()))
-        .addNativeModule(new FakeWebSocketModule())
         .addJSModule(ProgressBarTestModule.class)
         .build();
 

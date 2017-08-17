@@ -15,23 +15,13 @@ import java.util.List;
 import java.util.Map;
 
 import com.facebook.proguard.annotations.DoNotStrip;
+
 import com.facebook.react.bridge.BaseJavaModule;
+import com.facebook.react.bridge.CatalystInstance;
 import com.facebook.react.bridge.ExecutorToken;
-import com.facebook.react.bridge.JSInstance;
 import com.facebook.react.bridge.NativeArray;
-import com.facebook.react.bridge.NativeModule;
-import com.facebook.react.bridge.ReactMarker;
 import com.facebook.react.bridge.ReadableNativeArray;
 import com.facebook.react.bridge.WritableNativeArray;
-import com.facebook.react.bridge.WritableNativeMap;
-import com.facebook.systrace.Systrace;
-import com.facebook.systrace.SystraceMessage;
-
-import static com.facebook.react.bridge.ReactMarkerConstants.CONVERT_CONSTANTS_END;
-import static com.facebook.react.bridge.ReactMarkerConstants.CONVERT_CONSTANTS_START;
-import static com.facebook.react.bridge.ReactMarkerConstants.GET_CONSTANTS_END;
-import static com.facebook.react.bridge.ReactMarkerConstants.GET_CONSTANTS_START;
-import static com.facebook.systrace.Systrace.TRACE_TAG_REACT_JAVA_BRIDGE;
 
 /**
  * This is part of the glue which wraps a java BaseJavaModule in a C++
@@ -41,7 +31,7 @@ import static com.facebook.systrace.Systrace.TRACE_TAG_REACT_JAVA_BRIDGE;
  */
 
 @DoNotStrip
-public class JavaModuleWrapper {
+/* package */ class JavaModuleWrapper {
   @DoNotStrip
   public class MethodDescriptor {
     @DoNotStrip
@@ -54,44 +44,75 @@ public class JavaModuleWrapper {
     String type;
   }
 
-  private final JSInstance mJSInstance;
-  private final ModuleHolder mModuleHolder;
-  private final ArrayList<NativeModule.NativeMethod> mMethods;
+  private final CatalystInstance mCatalystInstance;
+  private final BaseJavaModule mModule;
+  private final ArrayList<BaseJavaModule.JavaMethod> mMethods;
 
-  public JavaModuleWrapper(JSInstance jsInstance, ModuleHolder moduleHolder) {
-    mJSInstance = jsInstance;
-    mModuleHolder = moduleHolder;
-    mMethods = new ArrayList<>();
+  public JavaModuleWrapper(CatalystInstance catalystinstance, BaseJavaModule module) {
+    mCatalystInstance = catalystinstance;
+    mModule = module;
+    mMethods = new ArrayList<BaseJavaModule.JavaMethod>();
   }
 
   @DoNotStrip
   public BaseJavaModule getModule() {
-    return (BaseJavaModule) mModuleHolder.getModule();
+    return mModule;
   }
 
   @DoNotStrip
   public String getName() {
-    return mModuleHolder.getName();
+    return mModule.getName();
   }
 
   @DoNotStrip
   public List<MethodDescriptor> getMethodDescriptors() {
     ArrayList<MethodDescriptor> descs = new ArrayList<>();
-    for (Map.Entry<String, NativeModule.NativeMethod> entry :
-          getModule().getMethods().entrySet()) {
+
+    for (Map.Entry<String, BaseJavaModule.NativeMethod> entry :
+           mModule.getMethods().entrySet()) {
       MethodDescriptor md = new MethodDescriptor();
       md.name = entry.getKey();
       md.type = entry.getValue().getType();
 
       BaseJavaModule.JavaMethod method = (BaseJavaModule.JavaMethod) entry.getValue();
-      if (md.type == BaseJavaModule.METHOD_TYPE_SYNC) {
-        md.signature = method.getSignature();
-        md.method = method.getMethod();
-      }
       mMethods.add(method);
 
       descs.add(md);
     }
+
+    return descs;
+  }
+
+  @DoNotStrip
+  public List<MethodDescriptor> newGetMethodDescriptors() {
+    ArrayList<MethodDescriptor> descs = new ArrayList<>();
+
+    for (Map.Entry<String, BaseJavaModule.NativeMethod> entry :
+           mModule.getMethods().entrySet()) {
+      MethodDescriptor md = new MethodDescriptor();
+      md.name = entry.getKey();
+      md.type = entry.getValue().getType();
+
+      BaseJavaModule.JavaMethod method = (BaseJavaModule.JavaMethod) entry.getValue();
+      md.method = method.getMethod();
+      md.signature = method.getSignature();
+
+      descs.add(md);
+    }
+
+    for (Map.Entry<String, BaseJavaModule.SyncNativeHook> entry :
+        mModule.getSyncHooks().entrySet()) {
+      MethodDescriptor md = new MethodDescriptor();
+      md.name = entry.getKey();
+      md.type = BaseJavaModule.METHOD_TYPE_SYNC_HOOK;
+
+      BaseJavaModule.SyncJavaHook method = (BaseJavaModule.SyncJavaHook) entry.getValue();
+      md.method = method.getMethod();
+      md.signature = method.getSignature();
+
+      descs.add(md);
+    }
+
     return descs;
   }
 
@@ -99,34 +120,14 @@ public class JavaModuleWrapper {
   // NativeMap out of OnLoad.
   @DoNotStrip
   public NativeArray getConstants() {
-    BaseJavaModule baseJavaModule = getModule();
-    ReactMarker.logMarker(GET_CONSTANTS_START, getName());
-    SystraceMessage.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "Map constants")
-      .arg("moduleName", getName())
-      .flush();
-    Map<String, Object> map = baseJavaModule.getConstants();
-    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
-
-    SystraceMessage.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "WritableNativeMap constants")
-      .arg("moduleName", getName())
-      .flush();
-    ReactMarker.logMarker(CONVERT_CONSTANTS_START, getName());
-    WritableNativeMap writableNativeMap;
-    try {
-      writableNativeMap = Arguments.makeNativeMap(map);
-    } finally {
-      Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
-    }
     WritableNativeArray array = new WritableNativeArray();
-    array.pushMap(writableNativeMap);
-    ReactMarker.logMarker(CONVERT_CONSTANTS_END);
-    ReactMarker.logMarker(GET_CONSTANTS_END);
+    array.pushMap(Arguments.makeNativeMap(mModule.getConstants()));
     return array;
   }
 
   @DoNotStrip
   public boolean supportsWebWorkers() {
-    return getModule().supportsWebWorkers();
+    return mModule.supportsWebWorkers();
   }
 
   @DoNotStrip
@@ -135,6 +136,6 @@ public class JavaModuleWrapper {
       return;
     }
 
-    mMethods.get(methodId).invoke(mJSInstance, token, parameters);
+    mMethods.get(methodId).invoke(mCatalystInstance, token, parameters);
   }
 }

@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <fb/log.h>
 
-#include <jschelpers/Value.h>
+#include <cxxreact/Value.h>
 
 namespace facebook {
 namespace react {
@@ -19,7 +19,7 @@ JSValueRef nativeLoggingHook(
     const JSValueRef arguments[], JSValueRef *exception) {
   android_LogPriority logLevel = ANDROID_LOG_DEBUG;
   if (argumentCount > 1) {
-    int level = (int)Value(ctx, arguments[1]).asNumber();
+    int level = (int) JSValueToNumber(ctx, arguments[1], NULL);
     // The lowest log level we get from JS is 0. We shift and cap it to be
     // in the range the Android logging method expects.
     logLevel = std::min(
@@ -27,10 +27,11 @@ JSValueRef nativeLoggingHook(
         ANDROID_LOG_FATAL);
   }
   if (argumentCount > 0) {
-    String message = Value(ctx, arguments[0]).toString();
+    JSStringRef jsString = JSValueToStringCopy(ctx, arguments[0], NULL);
+    String message = String::adopt(jsString);
     FBLOG_PRI(logLevel, "ReactNativeJS", "%s", message.str().c_str());
   }
-  return Value::makeUndefined(ctx);
+  return JSValueMakeUndefined(ctx);
 }
 
 }};

@@ -11,8 +11,6 @@ package com.facebook.react.cxxbridge;
 
 import android.content.Context;
 
-import com.facebook.react.devsupport.DebugServerException;
-
 /**
  * A class that stores JS bundle information and allows {@link CatalystInstance} to load a correct
  * bundle through {@link ReactBridge}.
@@ -21,36 +19,24 @@ public abstract class JSBundleLoader {
 
   /**
    * This loader is recommended one for release version of your app. In that case local JS executor
-   * should be used. JS bundle will be read from assets in native code to save on passing large
-   * strings from java to native memory.
+   * should be used. JS bundle will be read from assets directory in native code to save on passing
+   * large strings from java to native memory.
    */
-  public static JSBundleLoader createAssetLoader(
-      final Context context,
-      final String assetUrl) {
-    return new JSBundleLoader() {
-      @Override
-      public String loadScript(CatalystInstanceImpl instance) {
-        instance.loadScriptFromAssets(context.getAssets(), assetUrl);
-        return assetUrl;
-      }
-    };
-  }
-
-  /**
-   * This loader loads bundle from file system. The bundle will be read in native code to save on
-   * passing large strings from java to native memorory.
-   */
-  public static JSBundleLoader createFileLoader(final String fileName) {
-    return createFileLoader(fileName, fileName);
-  }
-
   public static JSBundleLoader createFileLoader(
-      final String fileName,
-      final String assetUrl) {
+      final Context context,
+      final String fileName) {
     return new JSBundleLoader() {
       @Override
-      public String loadScript(CatalystInstanceImpl instance) {
-        instance.loadScriptFromFile(fileName, assetUrl);
+      public void loadScript(CatalystInstanceImpl instance) {
+        if (fileName.startsWith("assets://")) {
+          instance.loadScriptFromAssets(context.getAssets(), fileName);
+        } else {
+          instance.loadScriptFromFile(fileName, fileName);
+        }
+      }
+
+      @Override
+      public String getSourceUrl() {
         return fileName;
       }
     };
@@ -68,13 +54,13 @@ public abstract class JSBundleLoader {
       final String cachedFileLocation) {
     return new JSBundleLoader() {
       @Override
-      public String loadScript(CatalystInstanceImpl instance) {
-        try {
-          instance.loadScriptFromFile(cachedFileLocation, sourceURL);
-          return sourceURL;
-        } catch (Exception e) {
-          throw DebugServerException.makeGeneric(e.getMessage(), e);
-        }
+      public void loadScript(CatalystInstanceImpl instance) {
+        instance.loadScriptFromFile(cachedFileLocation, sourceURL);
+      }
+
+      @Override
+      public String getSourceUrl() {
+        return sourceURL;
       }
     };
   }
@@ -88,15 +74,17 @@ public abstract class JSBundleLoader {
       final String realSourceURL) {
     return new JSBundleLoader() {
       @Override
-      public String loadScript(CatalystInstanceImpl instance) {
-        instance.setSourceURLs(realSourceURL, proxySourceURL);
+      public void loadScript(CatalystInstanceImpl instance) {
+        instance.loadScriptFromFile(null, proxySourceURL);
+      }
+
+      @Override
+      public String getSourceUrl() {
         return realSourceURL;
       }
     };
   }
 
-  /**
-   * Loads the script, returning the URL of the source it loaded.
-   */
-  public abstract String loadScript(CatalystInstanceImpl instance);
+  public abstract void loadScript(CatalystInstanceImpl instance);
+  public abstract String getSourceUrl();
 }

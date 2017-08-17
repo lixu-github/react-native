@@ -9,16 +9,17 @@
 
 #import "RCTTestRunner.h"
 
-#import <React/RCTAssert.h>
-#import <React/RCTBridge+Private.h>
-#import <React/RCTLog.h>
-#import <React/RCTRootView.h>
-#import <React/RCTUtils.h>
-
 #import "FBSnapshotTestController.h"
+#import "RCTAssert.h"
+#import "RCTLog.h"
+#import "RCTRootView.h"
 #import "RCTTestModule.h"
+#import "RCTUtils.h"
+#import "RCTJSCExecutor.h"
+#import "RCTBridge+Private.h"
 
-static const NSTimeInterval kTestTimeoutSeconds = 120;
+static const NSTimeInterval kTestTimeoutSeconds = 60;
+static const NSTimeInterval kTestTeardownTimeoutSeconds = 30;
 
 @implementation RCTTestRunner
 {
@@ -46,10 +47,11 @@ static const NSTimeInterval kTestTimeoutSeconds = 120;
 
     if (getenv("CI_USE_PACKAGER")) {
       _scriptURL = [NSURL URLWithString:[NSString stringWithFormat:@"http://localhost:8081/%@.bundle?platform=ios&dev=true", app]];
+      RCTAssert(_scriptURL != nil, @"No scriptURL set");
     } else {
       _scriptURL = [[NSBundle bundleForClass:[RCTBridge class]] URLForResource:@"main" withExtension:@"jsbundle"];
+      RCTAssert(_scriptURL != nil, @"Could not locate main.jsBundle");
     }
-    RCTAssert(_scriptURL != nil, @"No scriptURL set");
   }
   return self;
 }
@@ -95,6 +97,8 @@ expectErrorRegex:(NSString *)errorRegex
 configurationBlock:(void(^)(RCTRootView *rootView))configurationBlock
 expectErrorBlock:(BOOL(^)(NSString *error))expectErrorBlock
 {
+  __weak id weakJSContext;
+
   @autoreleasepool {
     __block NSString *error = nil;
     RCTSetLogFunction(^(RCTLogLevel level, RCTLogSource source, NSString *fileName, NSNumber *lineNumber, NSString *message) {
@@ -108,20 +112,15 @@ expectErrorBlock:(BOOL(^)(NSString *error))expectErrorBlock
                                                launchOptions:nil];
 
     RCTRootView *rootView = [[RCTRootView alloc] initWithBridge:bridge moduleName:moduleName initialProperties:initialProps];
-#if TARGET_OS_TV
-    rootView.frame = CGRectMake(0, 0, 1920, 1080); // Standard screen size for tvOS
-#else
     rootView.frame = CGRectMake(0, 0, 320, 2000); // Constant size for testing on multiple devices
-#endif
 
     RCTTestModule *testModule = [rootView.bridge moduleForClass:[RCTTestModule class]];
     RCTAssert(_testController != nil, @"_testController should not be nil");
     testModule.controller = _testController;
     testModule.testSelector = test;
-    testModule.testSuffix = _testSuffix;
     testModule.view = rootView;
 
-    UIViewController *vc = RCTSharedApplication().delegate.window.rootViewController;
+    UIViewController *vc = [UIApplication sharedApplication].delegate.window.rootViewController;
     vc.view = [UIView new];
     [vc.view addSubview:rootView]; // Add as subview so it doesn't get resized
 
@@ -135,6 +134,12 @@ expectErrorBlock:(BOOL(^)(NSString *error))expectErrorBlock
       [[NSRunLoop mainRunLoop] runMode:NSRunLoopCommonModes beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
     }
 
+    // Take a weak reference to the JS context, so we track its deallocation later
+    // (we can only do this now, since it's been lazily initialized)
+    id jsExecutor = [bridge.batchedBridge valueForKey:@"javaScriptExecutor"];
+    if ([jsExecutor isKindOfClass:[RCTJSCExecutor class]]) {
+      weakJSContext = [jsExecutor valueForKey:@"_context"];
+    }
     [rootView removeFromSuperview];
 
     RCTSetLogFunction(RCTDefaultLogFunction);
@@ -153,6 +158,14 @@ expectErrorBlock:(BOOL(^)(NSString *error))expectErrorBlock
     }
     [bridge invalidate];
   }
+
+  // Wait for the executor to have shut down completely before returning
+  NSDate *teardownTimeout = [NSDate dateWithTimeIntervalSinceNow:kTestTeardownTimeoutSeconds];
+  while (teardownTimeout.timeIntervalSinceNow > 0 && weakJSContext) {
+    [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+    [[NSRunLoop mainRunLoop] runMode:NSRunLoopCommonModes beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+  }
+  RCTAssert(!weakJSContext, @"JS context was not deallocated after being invalidated");
 }
 
 @end

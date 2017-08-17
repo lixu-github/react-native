@@ -7,8 +7,9 @@
 #include <thread>
 #include <queue>
 
-#include <jschelpers/JavaScriptCore.h>
-#include <jschelpers/Value.h>
+#include <JavaScriptCore/JSValueRef.h>
+
+#include "Value.h"
 
 namespace facebook {
 namespace react {
@@ -50,7 +51,7 @@ public:
   ~JSCWebWorker();
 
   /**
-   * Post a message to be received by the worker on its thread. This must be called from
+   * Post a message to be received by the worker on its thread. This must be called from 
    * ownerMessageQueueThread_.
    */
   void postMessage(JSValueRef msg);

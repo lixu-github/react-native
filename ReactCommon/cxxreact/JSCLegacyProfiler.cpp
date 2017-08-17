@@ -4,14 +4,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <JavaScriptCore/JavaScript.h>
 #include <JavaScriptCore/API/JSProfilerPrivate.h>
 #include <jsc_legacy_profiler.h>
-#include <jschelpers/JavaScriptCore.h>
-#include <jschelpers/JSCHelpers.h>
-#include <jschelpers/Value.h>
+#include "JSCHelpers.h"
 #include "JSCLegacyProfiler.h"
-
-using namespace facebook::react;
+#include "Value.h"
 
 static JSValueRef nativeProfilerStart(
     JSContextRef ctx,
@@ -22,20 +20,21 @@ static JSValueRef nativeProfilerStart(
     JSValueRef* exception) {
   if (argumentCount < 1) {
     if (exception) {
-      *exception = Value::makeError(
+      *exception = facebook::react::makeJSCException(
         ctx,
         "nativeProfilerStart: requires at least 1 argument");
     }
-    return Value::makeUndefined(ctx);
+    return JSValueMakeUndefined(ctx);
   }
 
-  auto title = String::adopt(ctx, JSValueToStringCopy(ctx, arguments[0], exception));
+  JSStringRef title = JSValueToStringCopy(ctx, arguments[0], exception);
   #if WITH_REACT_INTERNAL_SETTINGS
   JSStartProfiling(ctx, title, false);
   #else
   JSStartProfiling(ctx, title);
   #endif
-  return Value::makeUndefined(ctx);
+  JSStringRelease(title);
+  return JSValueMakeUndefined(ctx);
 }
 
 static JSValueRef nativeProfilerEnd(
@@ -47,25 +46,25 @@ static JSValueRef nativeProfilerEnd(
     JSValueRef* exception) {
   if (argumentCount < 1) {
     if (exception) {
-      *exception = Value::makeError(
+      *exception = facebook::react::makeJSCException(
         ctx,
         "nativeProfilerEnd: requires at least 1 argument");
     }
-    return Value::makeUndefined(ctx);
+    return JSValueMakeUndefined(ctx);
   }
 
   std::string writeLocation("/sdcard/");
   if (argumentCount > 1) {
-    auto fileName = String::adopt(
-      ctx, JSC_JSValueToStringCopy(ctx, arguments[1], exception));
-    writeLocation += fileName.str();
+    JSStringRef fileName = JSValueToStringCopy(ctx, arguments[1], exception);
+    writeLocation += facebook::react::String::ref(fileName).str();
+    JSStringRelease(fileName);
   } else {
     writeLocation += "profile.json";
   }
-  auto title = String::adopt(
-    ctx, JSC_JSValueToStringCopy(ctx, arguments[0], exception));
+  JSStringRef title = JSValueToStringCopy(ctx, arguments[0], exception);
   JSEndProfilingAndRender(ctx, title, writeLocation.c_str());
-  return Value::makeUndefined(ctx);
+  JSStringRelease(title);
+  return JSValueMakeUndefined(ctx);
 }
 
 namespace facebook {
@@ -79,7 +78,7 @@ void stopAndOutputProfilingFile(
 }
 
 void addNativeProfilingHooks(JSGlobalContextRef ctx) {
-  // JSEnableByteCodeProfiling();
+  JSEnableByteCodeProfiling();
   installGlobalFunction(ctx, "nativeProfilerStart", nativeProfilerStart);
   installGlobalFunction(ctx, "nativeProfilerEnd", nativeProfilerEnd);
 }
